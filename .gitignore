@@ -1,0 +1,10 @@
+# Canciones con derechos de autor: sólo en la PC local
+canciones/
+*.mp3
+*.wav
+*.flac
+*.m4a
+
+# Datos generados por herramientas/analizar.py
+herramientas/analisis.json
+__pycache__/

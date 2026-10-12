@@ -1,0 +1,1390 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ferrofluido</title>
+<style>
+  :root {
+    --glass: rgba(18, 18, 24, 0.55);
+    --line: rgba(255, 255, 255, 0.12);
+    --text: #ececf1;
+    --muted: #9a9aa8;
+    --accent: #ff2e93;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  body.idle { cursor: none; }
+
+  /* Pantalla de inicio */
+  #start { position: fixed; inset: 0; display: grid; place-items: center; transition: opacity .6s; z-index: 2; }
+  #start.hidden { opacity: 0; pointer-events: none; }
+  .card { background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--line); border-radius: 20px; padding: 32px 36px; max-width: 440px; width: calc(100% - 32px);
+    text-align: center; }
+  .card h1 { margin: 0 0 6px; font-weight: 600; font-size: 28px; letter-spacing: .5px; }
+  .card p { margin: 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .btns { display: grid; gap: 10px; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding: 4px; margin-bottom: 18px;
+    background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 14px; }
+  .seg button { border: none; background: transparent; }
+  .seg button.on { background: rgba(255,255,255,.14); }
+  button, select, label.file { font: inherit; color: var(--text); background: rgba(255,255,255,.06);
+    border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; cursor: pointer;
+    transition: background .2s, border-color .2s; font-size: 14px; }
+  button:hover, label.file:hover, select:hover { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); }
+  button.primary { background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
+  button.primary:hover { filter: brightness(1.1); background: var(--accent); }
+  input[type=file] { display: none; }
+  .hint { margin-top: 18px; font-size: 12px; color: var(--muted); }
+
+  /* Barra de controles */
+  #bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 3;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center;
+    background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; max-width: calc(100% - 32px);
+    transition: opacity .5s, transform .5s; }
+  #bar.hidden { opacity: 0; transform: translateX(-50%) translateY(20px); pointer-events: none; }
+  #bar button, #bar select, #bar label.file { padding: 7px 11px; font-size: 13px; border-radius: 10px; }
+  #bar select option { background: #15151b; }
+  .sl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  input[type=range] { accent-color: var(--accent); width: 90px; }
+  #status { font-size: 12px; color: var(--muted); padding: 0 4px; }
+  #err { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 4; background: rgba(120,20,40,.85);
+    padding: 10px 16px; border-radius: 10px; font-size: 13px; display: none; max-width: calc(100% - 32px); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="start">
+  <div class="card">
+    <h1>Resonancia</h1>
+    <p>Materia que se mueve con el sonido.</p>
+    <div class="seg">
+      <button data-mode="sphere">⚫ Esfera</button>
+      <button data-mode="drop">💧 Gota</button>
+      <button data-mode="sand">⏹ Arena</button>
+    </div>
+    <div class="btns">
+      <button class="primary" data-src="system">🔊 Audio del PC / pestaña</button>
+      <button data-src="mic">🎤 Micrófono</button>
+      <label class="file">🎵 Abrir canción…<input type="file" accept="audio/*" class="filein"></label>
+      <button data-src="demo">✨ Demo sin audio</button>
+    </div>
+    <div class="hint">M = cambiar modo · F = pantalla completa · H = ocultar controles</div>
+  </div>
+</div>
+
+<div id="bar" class="hidden">
+  <select id="mode" title="Modo">
+    <option value="sphere">⚫ Ferrofluido</option>
+    <option value="drop">💧 Gota</option>
+    <option value="sand">⏹ Arena</option>
+  </select>
+  <button data-src="system" title="Audio del sistema">🔊</button>
+  <button data-src="mic" title="Micrófono">🎤</button>
+  <label class="file" title="Abrir canción">🎵<input type="file" accept="audio/*" class="filein"></label>
+  <button data-src="demo" title="Demo">✨</button>
+  <select id="theme" title="Colores">
+    <option value="mood">🎭 Según la música</option>
+    <option value="neon">Neón</option>
+    <option value="sunset">Atardecer</option>
+    <option value="aurora">Aurora</option>
+    <option value="gold">Oro</option>
+    <option value="mono">Monocromo</option>
+  </select>
+  <span class="sl">Sensib. <input type="range" id="sens" min="0.3" max="2.5" step="0.05" value="1"></span>
+  <select id="quality" title="Calidad">
+    <option value="0.5">Rápido</option>
+    <option value="0.75">Normal</option>
+    <option value="1">Alta</option>
+  </select>
+  <button id="ai" title="IA de ánimo (Essentia): descarga ~13 MB la primera vez">🧠</button>
+  <button id="fs" title="Pantalla completa">⛶</button>
+  <span id="status">sin audio</span>
+  <span id="moodTag" title="Ánimo detectado en la música" style="font-size:12px;color:var(--muted)"></span>
+</div>
+<div id="err"></div>
+
+<!-- Esfera de ferrofluido (raymarching) -->
+<script id="sphere-fs" type="x-shader/x-fragment">
+precision highp float;
+uniform vec2 uRes;
+uniform float uTime;
+uniform sampler2D uBands;
+uniform float uLevel;
+uniform float uBass;
+uniform float uMid;
+uniform vec3 uColA;
+uniform vec3 uColB;
+uniform mat3 uRot;
+uniform vec3 uMag;
+
+#define PI 3.14159265
+#define PHI 1.61803398875
+#define NS 220.0
+#define R0 0.7
+#define RMAX 1.42
+#define SR 0.1
+
+float hash(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
+float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+float band(float x) {
+  return texture2D(uBands, vec2(clamp(x, 0.0, 1.0) * (63.0 / 64.0) + 0.5 / 64.0, 0.5)).r;
+}
+
+// Punto más cercano de una distribución de Fibonacci sobre la esfera (Keinert et al. 2015)
+float inverseSF(vec3 p, out vec3 cdir, out float idx) {
+  float m = 1.0 - 1.0 / NS;
+  float phi = min(atan(p.y, p.x), PI);
+  float cosT = p.z;
+  float k = max(2.0, floor(log(NS * PI * sqrt(5.0) * max(1.0 - cosT * cosT, 1e-6)) / log(PHI + 1.0)));
+  float Fk = pow(PHI, k) / sqrt(5.0);
+  vec2 F = floor(vec2(Fk, Fk * PHI) + 0.5);
+  vec2 ka = 2.0 * F / NS;
+  vec2 kb = 2.0 * PI * (fract((F + 1.0) * PHI) - (PHI - 1.0));
+  mat2 iB = mat2(ka.y, -ka.x, kb.y, -kb.x) / (ka.y * kb.x - ka.x * kb.y);
+  vec2 c = floor(iB * vec2(phi, cosT - m));
+  float d = 8.0;
+  idx = 0.0;
+  cdir = vec3(0.0, 0.0, 1.0);
+  for (int s = 0; s < 4; s++) {
+    vec2 uv = vec2(float(s - 2 * (s / 2)), float(s / 2));
+    float i = clamp(floor(dot(F, uv + c) + 0.5), 0.0, NS - 1.0);
+    float ph = 2.0 * PI * fract(i * PHI);
+    float ct = m - 2.0 * i / NS;
+    float st = sqrt(max(0.0, 1.0 - ct * ct));
+    vec3 q = vec3(cos(ph) * st, sin(ph) * st, ct);
+    float sd = dot(q - p, q - p);
+    if (sd < d) { d = sd; idx = i; cdir = q; }
+  }
+  return sqrt(d);
+}
+
+// Deformación suave tipo gelatina (sólo con sonido)
+float blob(vec3 n) {
+  return uBass * 0.14 * sin(3.0 * n.x + uTime * 1.3) * sin(3.0 * n.y + uTime * 1.1) * sin(3.0 * n.z + uTime * 0.9)
+       + uMid * 0.08 * sin(5.0 * n.x - uTime * 1.7 + 2.0 * n.z) * sin(4.0 * n.y + uTime * 1.2);
+}
+
+float baseR(vec3 n) { return R0 + uBass * 0.05 + blob(n); }
+
+float surf(vec3 p) {
+  vec3 q = uRot * p;
+  float r = length(q);
+  if (r > RMAX + 0.05) return r - RMAX;
+  vec3 n = q / max(r, 1e-4);
+  vec3 c;
+  float idx;
+  float d = inverseSF(n, c, idx);
+  float rnd = hash(idx);
+  float facing = dot(c, uMag);
+  float b = band((1.0 - facing) * 0.5 * 0.75 + rnd * 0.08);
+  float H = b * 0.42 * (0.35 + 0.65 * smoothstep(-0.7, 1.0, facing));
+  float shape = pow(max(1.0 - d / SR, 0.0), 2.2);
+  return r - baseR(n) - H * shape;
+}
+
+vec3 env(vec3 d) {
+  vec3 col = vec3(0.004) + vec3(0.012) * max(d.y, 0.0);
+  if (d.y > 0.0) {
+    vec2 q = d.xz / d.y;
+    float box = smoothstep(0.55, 0.45, abs(q.x)) * smoothstep(0.35, 0.25, abs(q.y));
+    col += box * 3.0;
+    float strip = smoothstep(0.06, 0.0, abs(q.y - 0.9)) * smoothstep(1.5, 1.2, abs(q.x));
+    col += strip * 1.2;
+  }
+  float hz = exp(-pow(d.y * 3.0, 2.0));
+  float ang = atan(d.z, d.x);
+  float a1 = pow(0.5 + 0.5 * cos(ang - uTime * 0.2), 6.0);
+  float a2 = pow(0.5 + 0.5 * cos(ang + 3.1416 - uTime * 0.2), 6.0);
+  col += hz * (uColA * a1 + uColB * a2) * (0.7 + uLevel * 3.5);
+  return col;
+}
+
+void main() {
+  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  vec3 ro = vec3(0.0, 0.0, 5.0);
+  vec3 rd = normalize(vec3(uv, -1.8));
+
+  float rl = length(uv);
+  vec3 bg = vec3(0.008, 0.008, 0.012)
+          + (uColA * 0.55 + uColB * 0.45) * exp(-max(rl - 0.18, 0.0) * 3.5) * (0.012 + uLevel * 0.3 + uBass * 0.2);
+  vec3 col = bg;
+
+  float bq = dot(ro, rd);
+  float disc = bq * bq - (dot(ro, ro) - RMAX * RMAX);
+  if (disc > 0.0) {
+    float t = max(-bq - sqrt(disc), 0.0);
+    float tEnd = -bq + sqrt(disc);
+    float tPrev = t;
+    bool hit = false;
+    for (int i = 0; i < 140; i++) {
+      float d = surf(ro + rd * t);
+      if (d < 0.0008) { hit = true; break; }
+      tPrev = t;
+      t += d * 0.35;
+      if (t > tEnd) break;
+    }
+    if (hit) {
+      for (int i = 0; i < 5; i++) {
+        float tm = 0.5 * (tPrev + t);
+        if (surf(ro + rd * tm) < 0.0) t = tm; else tPrev = tm;
+      }
+      vec3 p = ro + rd * t;
+      vec2 e = vec2(0.0015, -0.0015);
+      vec3 n = normalize(e.xyy * surf(p + e.xyy) + e.yyx * surf(p + e.yyx)
+                       + e.yxy * surf(p + e.yxy) + e.xxx * surf(p + e.xxx));
+      vec3 refl = reflect(rd, n);
+      float fres = 0.08 + 0.92 * pow(1.0 - max(dot(n, -rd), 0.0), 5.0);
+      vec3 lc = env(refl) * fres;
+      vec3 L = normalize(vec3(0.5, 1.0, 0.6));
+      lc += pow(max(dot(reflect(-L, n), -rd), 0.0), 140.0) * 0.9;
+      vec3 q = uRot * p;
+      float ao = mix(0.4, 1.0, smoothstep(0.0, 0.15, length(q) - baseR(normalize(q))));
+      col = lc * ao + vec3(0.004);
+    }
+  }
+
+  col = 1.0 - exp(-col * 1.3);
+  col = pow(col, vec3(1.0 / 2.2));
+  vec2 vq = gl_FragCoord.xy / uRes;
+  col *= 0.35 + 0.65 * pow(16.0 * vq.x * vq.y * (1.0 - vq.x) * (1.0 - vq.y), 0.25);
+  col += (hash2(gl_FragCoord.xy + fract(uTime)) - 0.5) / 255.0;
+  gl_FragColor = vec4(col, 1.0);
+}
+</script>
+
+<!-- Placa metálica (fondo del modo arena) -->
+<script id="plate-fs" type="x-shader/x-fragment">
+precision highp float;
+uniform vec2 uRes;
+uniform vec2 uScale;
+uniform vec3 uColA;
+uniform vec3 uColB;
+uniform float uLevel;
+void main() {
+  vec2 ndc = gl_FragCoord.xy / uRes * 2.0 - 1.0;
+  vec2 p = ndc / uScale;
+  float box = max(abs(p.x), abs(p.y));
+  vec3 col = vec3(0.006, 0.006, 0.009);
+  col += (uColA * 0.5 + uColB * 0.5) * exp(-max(box - 1.0, 0.0) * 5.0) * (0.02 + uLevel * 0.2);
+  if (box < 1.02) {
+    vec3 plate = vec3(0.03, 0.03, 0.036) * (1.15 - 0.3 * length(p));
+    plate += 0.004 * sin(p.x * 300.0 + 3.0 * sin(p.y * 7.0));
+    plate += vec3(0.05) * smoothstep(0.985, 1.02, box);
+    col = mix(col, plate, smoothstep(1.02, 1.01, box));
+  }
+  float bolt = length(p);
+  col = mix(col, vec3(0.07), smoothstep(0.04, 0.035, bolt));
+  col = pow(col, vec3(1.0 / 2.2));
+  vec2 vq = gl_FragCoord.xy / uRes;
+  col *= 0.4 + 0.6 * pow(16.0 * vq.x * vq.y * (1.0 - vq.x) * (1.0 - vq.y), 0.25);
+  gl_FragColor = vec4(col, 1.0);
+}
+</script>
+
+<script id="sand-vs" type="x-shader/x-vertex">
+attribute vec2 a;
+uniform vec2 uScale;
+uniform float uSize;
+void main() { gl_Position = vec4(a * uScale, 0.0, 1.0); gl_PointSize = uSize; }
+</script>
+<script id="sand-fs" type="x-shader/x-fragment">
+precision mediump float;
+uniform vec3 uCol;
+void main() {
+  float a = smoothstep(0.5, 0.15, length(gl_PointCoord - 0.5));
+  gl_FragColor = vec4(uCol * a, 1.0);
+}
+</script>
+
+<!-- Modo gota: ferrofluido visto desde arriba en una placa (metaballs + reflejos tornasolados) -->
+<script id="drop-fs" type="x-shader/x-fragment">
+precision highp float;
+uniform vec2 uRes;
+uniform float uDish;
+uniform float uTime;
+uniform float uLevel;
+uniform float uTex;
+uniform float uIrid;
+uniform float uWob;
+uniform vec3 uColA;
+uniform vec3 uColB;
+uniform vec4 uB[32];   // x, y, radio
+uniform vec4 uS[32];   // dirección de estiramiento (x, y), factor
+uniform sampler2D uBands;
+uniform vec3 uMain;    // gota principal: x, y, radio
+uniform float uRip;
+uniform float uHype;
+uniform float uWobT;   // fase de la ondulación (lenta en chill)
+uniform float uRipT;   // fase de las ondas
+uniform float uSpk;    // altura de los picos según el ánimo
+uniform float uSharp;  // filo de los picos (redondeados en chill, afilados en agresivo)
+
+#define DENS 17.0
+
+float band(float x) {
+  return texture2D(uBands, vec2(clamp(x, 0.0, 1.0) * (63.0 / 64.0) + 0.5 / 64.0, 0.5)).r;
+}
+
+// Celda hexagonal: xy = offset local, zw = id (centro = id * s)
+vec4 hexCell(vec2 p) {
+  vec2 s = vec2(1.0, 1.7320508);
+  vec4 hC = floor(vec4(p, p - vec2(0.5, 1.0)) / s.xyxy) + 0.5;
+  vec4 h = vec4(p - hC.xy * s, p - (hC.zw + 0.5) * s);
+  if (dot(h.xy, h.xy) < dot(h.zw, h.zw)) return vec4(h.xy, hC.xy);
+  return vec4(h.zw, hC.zw + 0.5);
+}
+
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+// Arrugas finas tipo laberinto (aparecen con los agudos)
+float ridges(vec2 p) {
+  float a = 1.0 - abs(noise(p) * 2.0 - 1.0);
+  float b = 1.0 - abs(noise(p * 2.1 + 7.3) * 2.0 - 1.0);
+  return a * a * 0.65 + b * b * 0.35;
+}
+
+float field(vec2 p) {
+  float f = 0.0;
+  for (int i = 0; i < 32; i++) {
+    vec4 b = uB[i];
+    if (b.z <= 0.0) continue;
+    vec4 s = uS[i];
+    vec2 d = p - b.xy;
+    float a = dot(d, s.xy);
+    vec2 perp = d - s.xy * a;
+    float d2 = a * a / (s.z * s.z) + dot(perp, perp) * s.z;
+    f += b.z * b.z / (d2 + 1e-5);
+  }
+  return f;
+}
+
+// Picos de Rosensweig vistos desde arriba: graves en el centro de la gota, agudos hacia el borde
+float spikes(vec2 p, float f) {
+  float a = uTime * 0.03;
+  float ca = cos(a), sa = sin(a);
+  vec2 q = mat2(ca, -sa, sa, ca) * p * DENS;
+  vec4 h = hexCell(q);
+  float depth = clamp(1.0 - 1.0 / max(f, 1e-4), 0.0, 1.0);
+  float b = band((1.0 - depth) * 0.75 + hash(h.zw) * 0.1);
+  float d = length(h.xy) * 2.0;
+  return pow(max(1.0 - d, 0.0), uSharp) * b * uSpk;
+}
+
+// Campo con el borde aserrado por los picos
+float fieldS(vec2 p, out float spk) {
+  float f = field(p);
+  spk = spikes(p, f);
+  return f * (1.0 + (0.6 + uHype * 0.6) * spk * smoothstep(0.3, 1.2, f));
+}
+
+float heightAt(vec2 p, float f, float spk) {
+  float h = clamp(1.0 - 1.0 / max(f, 1e-4), 0.0, 1.0);
+  h = 1.0 - pow(1.0 - h, 3.0);
+  vec2 q = p * 16.0 + vec2(uTime * 0.15, -uTime * 0.11);
+  float inner = smoothstep(1.0, 2.5, f);
+  h += uTex * 0.07 * ridges(q) * smoothstep(0.0, 0.5, h);
+  h += (0.55 + uHype * 0.5) * spk * inner;
+  h += uRip * 0.03 * sin(length(p - uMain.xy) * 70.0 - uRipT) * inner;
+  return h;
+}
+
+vec3 env(vec3 r) {
+  vec3 col = vec3(0.02);
+  if (r.z > 0.0) {
+    vec2 q = r.xy / r.z;
+    float win = smoothstep(0.32, 0.28, abs(q.x + 0.35)) * smoothstep(0.42, 0.38, abs(q.y - 0.3));
+    col += win * 2.2;
+    float ring = smoothstep(0.05, 0.0, abs(length(q - vec2(0.45, -0.2)) - 0.25));
+    col += ring * 0.8;
+  }
+  float g = pow(1.0 - clamp(r.z, 0.0, 1.0), 3.0);
+  float ang = atan(r.y, r.x);
+  col += g * mix(uColA, uColB, 0.5 + 0.5 * sin(ang + uTime * 0.25)) * (0.35 + uLevel * 1.5);
+  return col;
+}
+
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uDish;
+  float rd = length(p);
+
+  // Fondo y placa
+  vec3 bg = vec3(0.01, 0.01, 0.013) + mix(uColA, uColB, 0.5) * exp(-max(rd - 1.0, 0.0) * 4.0) * (0.03 + uLevel * 0.12);
+  vec3 dish = mix(vec3(0.66, 0.69, 0.74), (uColA + uColB) * 0.5, 0.12);
+  dish *= 0.55 + 0.45 * smoothstep(1.0, 0.0, rd);
+  dish += vec3(0.25) * smoothstep(0.9, 1.0, rd) * smoothstep(1.0, 0.97, rd);
+
+  vec2 pw = p + uWob * 0.035 * vec2(sin(p.y * 5.0 + uWobT * 1.03), cos(p.x * 4.5 - uWobT * 0.9));
+  float e = 1.5 / uDish;
+  float s0, sx, sy;
+  float f0 = fieldS(pw, s0);
+  float fx = fieldS(pw + vec2(e, 0.0), sx);
+  float fy = fieldS(pw + vec2(0.0, e), sy);
+  float sh = smoothstep(0.35, 1.3, field(pw + vec2(0.035, -0.05)));
+  dish *= 1.0 - 0.5 * sh;
+
+  float g = max(length(vec2(fx - f0, fy - f0)) / e, 1e-3);
+  float mask = clamp((f0 - 1.0) / g * uDish + 0.5, 0.0, 1.0);
+
+  float h0 = heightAt(pw, f0, s0);
+  float hx = heightAt(pw + vec2(e, 0.0), fx, sx);
+  float hy = heightAt(pw + vec2(0.0, e), fy, sy);
+  vec3 n = normalize(vec3(-(hx - h0) / e * 0.1, -(hy - h0) / e * 0.1, 1.0));
+
+  vec3 r = reflect(vec3(0.0, 0.0, -1.0), n);
+  float fres = 0.05 + 0.95 * pow(1.0 - n.z, 5.0);
+  float th = 0.5 + 0.6 * noise(pw * 2.5 + uTime * 0.06) + 0.5 * (1.0 - h0);
+  vec3 film = 0.5 + 0.5 * cos(6.2831 * (th * vec3(1.0, 0.82, 0.66) * 1.7 + vec3(0.0, 0.25, 0.5)));
+  vec3 refl = env(r) * mix(vec3(1.0), film * 1.7, uIrid);
+  vec3 L = normalize(vec3(-0.4, 0.5, 0.75));
+  float spec = pow(max(dot(n, normalize(L + vec3(0.0, 0.0, 1.0))), 0.0), 140.0);
+  vec3 drop = vec3(0.006) + refl * fres + spec * 0.9 * mix(vec3(1.0), film, uIrid * 0.6);
+
+  vec3 inside = mix(dish, drop, mask);
+  vec3 col = mix(inside, bg, smoothstep(1.0, 1.0 + 2.0 / uDish, rd));
+
+  col = 1.0 - exp(-col * 1.4);
+  col = pow(col, vec3(1.0 / 2.2));
+  vec2 vq = gl_FragCoord.xy / uRes;
+  col *= 0.45 + 0.55 * pow(16.0 * vq.x * vq.y * (1.0 - vq.x) * (1.0 - vq.y), 0.25);
+  col += (hash(gl_FragCoord.xy + fract(uTime)) - 0.5) / 255.0;
+  gl_FragColor = vec4(col, 1.0);
+}
+</script>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const canvas = $('#c');
+  const showErr = msg => { const e = $('#err'); e.textContent = msg; e.style.display = 'block';
+    clearTimeout(showErr.t); showErr.t = setTimeout(() => e.style.display = 'none', 6000); };
+
+  // ---------- Ajustes ----------
+  const THEMES = {
+    neon:   [[1.0, 0.15, 0.6], [0.1, 0.6, 1.0], '#ff2e93'],
+    sunset: [[1.0, 0.45, 0.1], [0.9, 0.1, 0.3], '#ff6a1a'],
+    aurora: [[0.1, 1.0, 0.6], [0.4, 0.2, 1.0], '#2ee6a0'],
+    gold:   [[1.0, 0.72, 0.3], [1.0, 0.9, 0.7], '#e8b04a'],
+    mono:   [[0.9, 0.9, 0.95], [0.6, 0.6, 0.7], '#c8c8d0'],
+  };
+  const settings = { mode: 'sphere', theme: 'mood', sens: 1, quality: 0.75, rotate: true, ai: true };
+  try { Object.assign(settings, JSON.parse(localStorage.getItem('ferro-settings') || '{}')); } catch {}
+  if (!settings.v2) { settings.theme = 'mood'; settings.v2 = true; } // estrena los colores según el ánimo
+  // Colores por ánimo: agresivo = fuego, chill = azul/violeta, bailable = colores reggae
+  const MOOD_COLORS = {
+    agresivo: [[1.0, 0.12, 0.05], [1.0, 0.55, 0.0]],
+    chill: [[0.25, 0.35, 1.0], [0.6, 0.3, 0.95]],
+    bailable: [[1.0, 0.8, 0.1], [0.1, 0.85, 0.35]],
+  };
+  const moodTheme = [[0, 0, 0], [0, 0, 0], '#9b7bff'];
+  function currentTheme() {
+    if (settings.theme !== 'mood') return THEMES[settings.theme] || THEMES.neon;
+    for (let c = 0; c < 2; c++) for (let i = 0; i < 3; i++) {
+      let v = 0;
+      for (const k in MOOD_COLORS) v += MOOD_COLORS[k][c][i] * mood[k];
+      moodTheme[c][i] = v;
+    }
+    return moodTheme;
+  }
+  const save = () => { try { localStorage.setItem('ferro-settings', JSON.stringify(settings)); } catch {} };
+
+  const params = new URLSearchParams(location.search);
+  const wallpaperMode = params.has('wallpaper');
+  const MODE_LIST = ['sphere', 'drop', 'sand'];
+  if (MODE_LIST.includes(params.get('mode'))) settings.mode = params.get('mode');
+  if (!MODE_LIST.includes(settings.mode)) settings.mode = 'sphere';
+
+  // ---------- WebGL ----------
+  const glOpts = { antialias: false, alpha: false, powerPreference: 'high-performance' };
+  const gl = canvas.getContext('webgl2', glOpts) || canvas.getContext('webgl', glOpts);
+  const isGL2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
+  if (!gl) { showErr('Tu navegador no soporta WebGL.'); return; }
+
+  const FULL_VS = 'attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }';
+  function program(vsSrc, fsSrc, uniforms) {
+    const compile = (type, src) => {
+      const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      return s;
+    };
+    const p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, vsSrc));
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
+    gl.bindAttribLocation(p, 0, 'a');
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    const u = {};
+    uniforms.forEach(n => u[n] = gl.getUniformLocation(p, n));
+    return { p, u };
+  }
+  let sphereP, plateP, sandP, dropP;
+  try {
+    sphereP = program(FULL_VS, $('#sphere-fs').textContent,
+      ['uRes', 'uTime', 'uBands', 'uLevel', 'uBass', 'uMid', 'uColA', 'uColB', 'uRot', 'uMag']);
+    plateP = program(FULL_VS, $('#plate-fs').textContent, ['uRes', 'uScale', 'uColA', 'uColB', 'uLevel']);
+    sandP = program($('#sand-vs').textContent, $('#sand-fs').textContent, ['uScale', 'uSize', 'uCol']);
+    dropP = program(FULL_VS, $('#drop-fs').textContent,
+      ['uRes', 'uDish', 'uTime', 'uLevel', 'uTex', 'uIrid', 'uWob', 'uColA', 'uColB', 'uB', 'uS',
+       'uBands', 'uMain', 'uRip', 'uHype', 'uWobT', 'uRipT', 'uSpk', 'uSharp']);
+  } catch (e) { showErr('Error de gráficos: ' + e.message); console.error(e); return; }
+
+  const triBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, triBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+
+  const NB = 64;
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const texData = new Uint8Array(NB);
+
+  let dpr = 1;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.max(1, Math.floor(innerWidth * dpr * settings.quality));
+    const h = Math.max(1, Math.floor(innerHeight * dpr * settings.quality));
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    gl.viewport(0, 0, w, h);
+  }
+  addEventListener('resize', resize);
+
+  // ---------- Audio ----------
+  let actx = null, analyser = null, freq = null, current = null;
+  let source = 'none';           // 'none' | 'analyser' | 'external' | 'demo'
+  const raw = new Float32Array(NB);
+  const ext = new Float32Array(NB);
+  const noise = new Float32Array(NB).fill(1);
+  let extTime = 0;
+  const pos = new Float32Array(NB), vel = new Float32Array(NB);
+  let peak = 0.3, level = 0, bass = 0, mid = 0, high = 0, drive = 0, centroid = 0.3;
+
+  function ensureCtx() {
+    if (!actx) {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = actx.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.55;
+      analyser.minDecibels = -85;
+      analyser.maxDecibels = -20;
+      freq = new Uint8Array(analyser.frequencyBinCount);
+    }
+    if (actx.state === 'suspended') actx.resume();
+  }
+  function stopCurrent() { if (current) { try { current.stop(); } catch {} current = null; } noise.fill(1); }
+
+  function useStream(stream, label) {
+    stopCurrent(); ensureCtx();
+    const node = actx.createMediaStreamSource(stream);
+    node.connect(analyser);
+    current = { stop() { node.disconnect(); stream.getTracks().forEach(t => t.stop()); } };
+    source = 'analyser'; setStatus(label); started(); tapEssentia();
+  }
+
+  async function startMic() {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      useStream(s, '🎤 micrófono');
+    } catch (e) { showErr('No se pudo usar el micrófono: ' + e.message); }
+  }
+
+  async function startSystem() {
+    try {
+      const s = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, systemAudio: 'include' });
+      if (!s.getAudioTracks().length) {
+        s.getTracks().forEach(t => t.stop());
+        showErr('No llegó audio. Al compartir, elige "Pantalla completa" o una pestaña y activa "Compartir audio".');
+        return;
+      }
+      useStream(s, '🔊 audio del sistema');
+    } catch (e) { if (e.name !== 'NotAllowedError') showErr('No se pudo capturar el audio: ' + e.message); }
+  }
+
+  function startFile(file) {
+    if (!file) return;
+    stopCurrent(); ensureCtx();
+    const audio = new Audio(URL.createObjectURL(file));
+    audio.loop = true;
+    const node = actx.createMediaElementSource(audio);
+    node.connect(analyser); analyser.connect(actx.destination);
+    audio.play().catch(e => showErr(e.message));
+    current = { stop() { audio.pause(); node.disconnect(); try { analyser.disconnect(actx.destination); } catch {} URL.revokeObjectURL(audio.src); } };
+    source = 'analyser'; setStatus('🎵 ' + file.name.replace(/\.[^.]+$/, '').slice(0, 28)); started(); tapEssentia();
+  }
+
+  function startDemo() { stopCurrent(); source = 'demo'; setStatus('✨ demo'); started(); }
+
+  // Fondos animados: Lively Wallpaper y Wallpaper Engine envían el audio del sistema (128 valores)
+  function externalAudio(arr, stereoSplit) {
+    const n = stereoSplit ? arr.length / 2 : arr.length;
+    for (let i = 0; i < NB; i++) {
+      const k = Math.floor(i * n / NB), k2 = Math.max(Math.floor((i + 1) * n / NB), k + 1);
+      let s = 0, c = 0;
+      for (let j = k; j < k2; j++) { s += arr[j]; c++; if (stereoSplit) { s += arr[j + n]; c++; } }
+      ext[i] = Math.min(1, s / c);
+    }
+    extTime = performance.now();
+    if (source !== 'external' && source !== 'analyser') { noise.fill(1); source = 'external'; setStatus('🔊 fondo de pantalla'); started(true); }
+  }
+  window.livelyAudioListener = arr => externalAudio(arr, false);
+  if (window.wallpaperRegisterAudioListener) window.wallpaperRegisterAudioListener(arr => externalAudio(arr, true));
+
+  function bandsFrom(an, buf, out) {
+    an.getByteFrequencyData(buf);
+    const nyq = actx.sampleRate / 2, n = buf.length;
+    for (let i = 0; i < NB; i++) {
+      const f0 = 30 * Math.pow(12000 / 30, i / NB), f1 = 30 * Math.pow(12000 / 30, (i + 1) / NB);
+      const b0 = Math.floor(f0 / nyq * n), b1 = Math.max(b0 + 1, Math.ceil(f1 / nyq * n));
+      let s = 0; for (let k = b0; k < b1; k++) s += buf[k];
+      out[i] = s / ((b1 - b0) * 255);
+    }
+  }
+
+  // El detector de ánimo lee su propio analizador con un reloj fijo de 60 Hz,
+  // así no depende de a cuántos cuadros por segundo dibuje la pantalla.
+  let moodAn = null, moodBuf = null;
+  const moodBands = new Float32Array(NB);
+  setInterval(() => {
+    if (source !== 'analyser' || !analyser) return;
+    if (!moodAn) {
+      moodAn = actx.createAnalyser();
+      moodAn.fftSize = 2048; moodAn.smoothingTimeConstant = 0.55;
+      moodAn.minDecibels = -85; moodAn.maxDecibels = -20;
+      moodBuf = new Uint8Array(moodAn.frequencyBinCount);
+      analyser.connect(moodAn);
+    }
+    bandsFrom(moodAn, moodBuf, moodBands);
+    moodDet.push(moodBands);
+  }, 1000 / 60);
+
+  function readBands(t) {
+    if (source === 'analyser') {
+      bandsFrom(analyser, freq, raw);
+      return 2.2;
+    }
+    if (source === 'external') {
+      raw.set(ext);
+      if (performance.now() - extTime > 500) raw.fill(0);
+      return 1.0;
+    }
+    if (source === 'song') { // pruebas: bandas pregrabadas de una canción (ver ?song=)
+      const S = window.__SONG, f = Math.floor(t * 60) % S.frames;
+      for (let i = 0; i < NB; i++) raw[i] = S.data[f * NB + i] / 255;
+      return 2.2;
+    }
+    if (source === 'demo') {
+      const beat = Math.pow(Math.max(0, Math.sin(t * Math.PI * 2 * 2.0)), 12);
+      const snare = Math.pow(Math.max(0, Math.sin(t * Math.PI * 2.0 + 1.2)), 30);
+      const sweep = 0.5 + 0.5 * Math.sin(t * 0.21);
+      // Cada 20 s: 8 s de "drop" con bajo wobble (dubstep)
+      const dropOn = (t % 20) > 12 ? 1 : 0;
+      const wobble = dropOn * (0.5 + 0.5 * Math.sin(t * Math.PI * 2 * (t % 4 < 2 ? 3 : 6)));
+      for (let i = 0; i < NB; i++) {
+        const x = i / NB;
+        raw[i] = Math.min(1, beat * Math.exp(-x * 6) * 1.1 + snare * Math.exp(-Math.pow((x - 0.5) * 4, 2)) * 0.8
+          + wobble * Math.exp(-x * 4) * 1.2 + dropOn * 0.35 * Math.exp(-x * 2)
+          + 0.5 * Math.exp(-Math.pow((x - sweep) * 6, 2)) * (0.6 + 0.4 * Math.sin(t * 3.1))
+          + 0.3 * (0.5 + 0.5 * Math.sin(t * 5.3 + i * 0.7)) * (1 - x * 0.6));
+      }
+      return 1.0;
+    }
+    raw.fill(0);
+    return 1.0;
+  }
+
+  // <mood> Detector de ánimo: agresivo / chill / bailable.
+  // Calibrado con herramientas/analizar.py sobre Supersonic, death bed e Is This Love.
+  // Mira los últimos 8 s: golpes por segundo, bajo relativo a los medios y regularidad del ritmo.
+  function createMoodDetector() {
+    const N = 480;                                   // 8 s a 60 cuadros por segundo
+    const fluxB = new Float32Array(N), bassB = new Float32Array(N), midB = new Float32Array(N), loudB = new Float32Array(N);
+    const prev = new Float32Array(64);
+    const MU = [5.965, -0.003, 0.471], SD = [0.993, 0.153, 0.163];
+    const CENTERS = {
+      agresivo: [1.208, 0.693, -0.779],
+      chill: [-0.498, -0.444, -0.368],
+      bailable: [-0.526, -0.196, 0.773],
+    };
+    const det = { mood: { agresivo: 0.2, chill: 0.6, bailable: 0.2 }, feats: null, bpm: 0 };
+    let n = 0, head = 0, sinceEval = 0, started = false;
+
+    det.push = bands => {
+      let f = 0, b = 0, m = 0, l = 0;
+      for (let i = 0; i < 64; i++) {
+        const d = bands[i] - prev[i];
+        if (started && d > 0) f += d;
+        l += bands[i];
+        if (i < 8) b += bands[i]; else if (i < 30) m += bands[i];
+        prev[i] = bands[i];
+      }
+      started = true;
+      fluxB[head] = f; bassB[head] = b / 8; midB[head] = m / 22; loudB[head] = l / 64;
+      head = (head + 1) % N; n = Math.min(N, n + 1);
+      if (++sinceEval >= 30) { sinceEval = 0; evaluate(); }
+    };
+
+    function evaluate() {
+      if (n < 240) return;
+      const f = new Float32Array(n);
+      let loud = 0, bass = 0, mid = 0, fm = 0;
+      for (let k = 0; k < n; k++) {
+        const i = (head - n + k + N) % N;
+        f[k] = fluxB[i]; loud += loudB[i]; bass += bassB[i]; mid += midB[i]; fm += fluxB[i];
+      }
+      loud /= n; bass /= n; mid /= n; fm /= n;
+      if (loud < 0.2) return;                         // silencio o muy bajo: conserva el ánimo
+      // Golpes: picos de flux sobre un umbral adaptativo (media móvil de 30 cuadros)
+      const pre = new Float32Array(n + 1);
+      for (let k = 0; k < n; k++) pre[k + 1] = pre[k] + f[k];
+      let peaks = 0;
+      for (let k = 1; k < n - 1; k++) {
+        const a = Math.max(0, k - 15), b2 = Math.min(n, k + 15);
+        const thr = (pre[b2] - pre[a]) / 30 * 1.4 + 0.02;
+        if (f[k] > thr && f[k] > f[k - 1] && f[k] >= f[k + 1]) peaks++;
+      }
+      const onsets = peaks / (n / 60);
+      // Regularidad: autocorrelación del flux entre 50 y 200 BPM
+      let ac0 = 0;
+      for (let k = 0; k < n; k++) { f[k] -= fm; ac0 += f[k] * f[k]; }
+      let best = -1, lag = 36;
+      for (let L = 18; L < 72; L++) {
+        let s = 0;
+        for (let k = 0; k + L < n; k++) s += f[k] * f[k + L];
+        s /= ac0 + 1e-9;
+        if (s > best) { best = s; lag = L; }
+      }
+      const x = [onsets, bass - mid, best];
+      const z = x.map((v, i) => (v - MU[i]) / SD[i]);
+      const w = {};
+      let tot = 0;
+      for (const k in CENTERS) {
+        const d = CENTERS[k].reduce((s, c, i) => s + (z[i] - c) * (z[i] - c), 0);
+        w[k] = Math.exp(-d / 2); tot += w[k];
+      }
+      for (const k in w) det.mood[k] += (w[k] / tot - det.mood[k]) * 0.15;
+      det.feats = { onsets, bassRel: bass - mid, regular: best };
+      det.bpm = 3600 / lag;
+    }
+    return det;
+  }
+  // </mood>
+  const moodDet = createMoodDetector();
+  let moodAcc = 0;
+  const moodPrev = new Float32Array(64), moodFrame = new Float32Array(64);
+
+  // ---------- IA de ánimo con Essentia (opcional) ----------
+  // Modelos MusiCNN de la Universitat Pompeu Fabra (essentia.js, AGPL-3.0; modelos CC BY-NC-ND 4.0).
+  // Corren en un worker cada ~3 s de audio. Essentia acierta muy bien lo agresivo; para chill vs.
+  // bailable se combina con el detector propio (regularidad del ritmo), que ahí separa mejor.
+  const ESS = { worker: null, ready: false, failed: false, busy: false, backend: '', agg: null, dance: null, relax: null, last: 0 };
+  const ESS_SHA = '819c00e8f034dc709e3d330ed8ac9ed37dfdb767';
+  const ESS_WORKER = `
+    self.exports = {};
+    importScripts(
+      'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.5.0/dist/tf.min.js',
+      'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@3.5.0/dist/tf-backend-wasm.min.js',
+      'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.umd.js',
+      'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-model.umd.js');
+    const EW = self.exports.EssentiaWASM || self.Module;
+    const POS = { mood_aggressive: 0, mood_relaxed: 1, danceability: 0 };
+    const url = m => 'https://cdn.jsdelivr.net/gh/MTG/essentia.js@${ESS_SHA}/examples/demos/mood-classifiers/models/' + m + '-musicnn-msd-2/model.json';
+    let extractor = null;
+    const models = {};
+    async function init() {
+      await new Promise(r => { if (EW.EssentiaJS) r(); else EW.onRuntimeInitialized = r; });
+      let ok = false;
+      try { ok = await tf.setBackend('webgl'); } catch (e) {}
+      if (!ok) { tf.wasm.setWasmPaths('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@3.5.0/dist/'); await tf.setBackend('wasm'); }
+      await tf.ready();
+      extractor = new EssentiaModel.EssentiaTFInputExtractor(EW, 'musicnn', false);
+      for (const m in POS) { models[m] = new EssentiaModel.TensorflowMusiCNN(tf, url(m)); await models[m].initialize(); }
+      postMessage({ type: 'ready', backend: tf.getBackend() });
+    }
+    onmessage = async e => {
+      if (!extractor) return;
+      const t0 = performance.now();
+      try {
+        const feats = extractor.computeFrameWise(e.data, 256);
+        const out = { type: 'pred' };
+        for (const m in POS) { const p = await models[m].predict(feats, true); out[m] = p[0][POS[m]]; }
+        out.ms = performance.now() - t0;
+        postMessage(out);
+      } catch (err) { postMessage({ type: 'error', msg: String(err && err.message || err) }); }
+    };
+    init().catch(err => postMessage({ type: 'error', msg: 'init: ' + String(err && err.message || err) }));
+  `;
+
+  function startEssentia() {
+    if (ESS.worker || ESS.failed || !settings.ai) return;
+    try {
+      ESS.worker = new Worker(URL.createObjectURL(new Blob([ESS_WORKER], { type: 'text/javascript' })));
+    } catch (e) { ESS.failed = true; console.warn('Essentia no disponible:', e); return; }
+    ESS.worker.onmessage = ({ data: d }) => {
+      if (d.type === 'ready') { ESS.ready = true; ESS.backend = d.backend; console.info('Essentia listo (' + d.backend + ')'); }
+      else if (d.type === 'pred') {
+        ESS.busy = false; ESS.last = performance.now();
+        const k = ESS.agg === null ? 1 : 0.5;          // promedio móvil de los últimos parches de 3 s
+        ESS.agg = ESS.agg === null ? d.mood_aggressive : ESS.agg + (d.mood_aggressive - ESS.agg) * k;
+        ESS.dance = ESS.dance === null ? d.danceability : ESS.dance + (d.danceability - ESS.dance) * k;
+        ESS.relax = ESS.relax === null ? d.mood_relaxed : ESS.relax + (d.mood_relaxed - ESS.relax) * k;
+        if (ESS.onPred) ESS.onPred(d);
+      } else if (d.type === 'error') {
+        ESS.busy = false; ESS.lastErr = d.msg;
+        console.warn('Essentia:', d.msg);
+        if (!ESS.ready) { ESS.failed = true; ESS.worker.terminate(); ESS.worker = null; }
+      }
+    };
+    ESS.worker.onerror = e => { console.warn('Essentia worker:', e.message); ESS.failed = true; ESS.busy = false; };
+  }
+
+  // Captura de audio a 16 kHz para Essentia: junta ~3.1 s y los manda al worker
+  const ESS_LEN = 49600;
+  const essBuf = new Float32Array(ESS_LEN);
+  let essFill = 0, essTap = null, essPos = 0;
+  function feedEssentia(input, rate) {
+    // Remuestreo a 16 kHz con filtro de caja (antialias); essPos guarda la posición entre bloques
+    const ratio = rate / 16000, half = ratio / 2;
+    while (essPos + half < input.length) {
+      const a = Math.max(0, Math.floor(essPos - half)), b = Math.floor(essPos + half);
+      let s = 0;
+      for (let i = a; i <= b; i++) s += input[i];
+      essBuf[essFill++] = s / (b - a + 1);
+      essPos += ratio;
+      if (essFill === ESS_LEN) {
+        essFill = 0;
+        let e2 = 0;
+        for (let i = 0; i < ESS_LEN; i += 16) e2 += essBuf[i] * essBuf[i];
+        const loudEnough = e2 / (ESS_LEN / 16) > 1e-5;
+        if (ESS.ready && !ESS.busy && loudEnough) { ESS.busy = true; ESS.worker.postMessage(essBuf.slice()); }
+      }
+    }
+    essPos -= input.length;
+  }
+  function tapEssentia() {
+    if (essTap || !settings.ai || !actx || !analyser) return;
+    startEssentia();
+    essTap = actx.createScriptProcessor(4096, 1, 1);
+    const mute = actx.createGain(); mute.gain.value = 0;
+    essTap.onaudioprocess = ev => { if (ESS.ready && source === 'analyser') feedEssentia(ev.inputBuffer.getChannelData(0), actx.sampleRate); };
+    analyser.connect(essTap); essTap.connect(mute); mute.connect(actx.destination);
+  }
+
+  // Ánimo final que usa toda la app: Essentia + detector propio, cambiando suavemente
+  const mood = { agresivo: 0.2, chill: 0.6, bailable: 0.2 };
+  function updateMood(dt) {
+    const m = moodDet.mood;
+    let A = m.agresivo, C = m.chill, D = m.bailable;
+    if (ESS.agg !== null && performance.now() - ESS.last < 12000 && source === 'analyser') {
+      A = 0.65 * ESS.agg + 0.35 * m.agresivo;
+      const dShare = 0.35 * ESS.dance + 0.65 * (m.bailable / (m.bailable + m.chill + 1e-6));
+      D = (1 - A) * dShare; C = (1 - A) * (1 - dShare);
+    }
+    const k = 1 - Math.exp(-dt / 1.5);
+    mood.agresivo += (A - mood.agresivo) * k;
+    mood.chill += (C - mood.chill) * k;
+    mood.bailable += (D - mood.bailable) * k;
+  }
+
+  // Compuerta de ruido + resortes amortiguados por banda (movimiento viscoso, vuelve a 0 en silencio)
+  let acc = 0, lastT = performance.now(), bassAvg = 0, beat = false;
+  function updateAudio(now) {
+    const t = now / 1000;
+    const expo = readBands(t);
+    const dtMs = Math.min(now - lastT, 100); lastT = now;
+    if (source !== 'none' && source !== 'analyser') {
+      // (Con micrófono/sistema/archivo el detector usa su propio reloj; ver setInterval arriba.)
+      // El detector espera 60 cuadros/s: si el navegador va más lento, interpola (repetir
+      // cuadros parecería música llena de golpes); si va más rápido, toma uno cada 1/60 s.
+      moodAcc += dtMs;
+      const k = Math.min(6, Math.floor(moodAcc / 16.67));
+      moodAcc -= k * 16.67;
+      for (let j = 1; j <= k; j++) {
+        for (let i = 0; i < NB; i++) moodFrame[i] = moodPrev[i] + (raw[i] - moodPrev[i]) * j / k;
+        moodDet.push(moodFrame);
+      }
+      if (k > 0) moodPrev.set(raw);
+    }
+    let mx = 0;
+    for (let i = 0; i < NB; i++) {
+      noise[i] = Math.min(raw[i], noise[i] + 0.0025 * dtMs / 1000);
+      raw[i] = Math.max(0, raw[i] - noise[i] - 0.02);
+      mx = Math.max(mx, raw[i]);
+    }
+    peak = Math.max(peak * 0.997, mx, 0.15);
+
+    beat = false;
+    acc += dtMs;
+    while (acc >= 16.67) {
+      acc -= 16.67;
+      let lv = 0, bs = 0, md = 0, hs = 0, wsum = 0, csum = 0, top = 0;
+      for (let i = 0; i < NB; i++) {
+        const target = Math.pow(Math.min(1, raw[i] / peak), expo) * settings.sens;
+        vel[i] += (target - pos[i]) * 0.16;
+        vel[i] *= 0.74;
+        pos[i] += vel[i];
+        lv += pos[i]; top = Math.max(top, pos[i]);
+        if (i < 8) bs += pos[i]; else if (i < 30) md += pos[i]; else if (i >= 36) hs += pos[i];
+        const w = Math.max(0, target); wsum += w; csum += w * i;
+      }
+      level += (lv / NB - level) * 0.15;
+      drive += (Math.min(1.2, lv / NB * 3 + top * 0.6) - drive) * 0.12;
+      const bNow = bs / 8;
+      if (bNow > bassAvg * 1.35 + 0.08) beat = true;
+      bassAvg += (bNow - bassAvg) * 0.05;
+      bass += (bNow - bass) * 0.2;
+      mid += (md / 22 - mid) * 0.15;
+      high += (hs / 28 - high) * 0.15;
+      if (wsum > 0.5) centroid += (csum / wsum / NB - centroid) * 0.03;
+    }
+    for (let i = 0; i < NB; i++) texData[i] = Math.max(0, Math.min(255, pos[i] * 255));
+    // Tono dominante normalizado a 0..1 según el rango reciente de la canción
+    cMin = Math.min(cMin + 0.0005, centroid); cMax = Math.max(cMax - 0.0005, centroid);
+    cNorm = Math.min(1, Math.max(0, (centroid - cMin) / Math.max(0.08, cMax - cMin)));
+    if (params.has('cn')) cNorm = +params.get('cn'); // pruebas
+    silence = drive < 0.04 ? Math.min(1, silence + dtMs / 2500) : 0;
+  }
+  let cMin = 0.2, cMax = 0.4, cNorm = 0.5, silence = 1;
+
+  // ---------- Modo arena (figuras de Chladni) ----------
+  const MODES = [];
+  for (let n = 1; n <= 8; n++) for (let m = n + 1; m <= 9; m++) { MODES.push([n, m, -1]); MODES.push([n, m, 1]); }
+  MODES.sort((a, b) => (a[0] * a[0] + a[1] * a[1]) - (b[0] * b[0] + b[1] * b[1]));
+  const NP = 50000;
+  const grains = new Float32Array(NP * 2);
+  for (let i = 0; i < NP * 2; i++) grains[i] = Math.random() * 2 - 1;
+  const grainBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, grainBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, grains, gl.DYNAMIC_DRAW);
+  let modeA = MODES[3], modeB = MODES[3], blend = 1, lastSwitch = 0;
+
+  const PI = Math.PI;
+  const chladni = (md, x, y) =>
+    Math.cos(md[0] * PI * x) * Math.cos(md[1] * PI * y) + md[2] * Math.cos(md[1] * PI * x) * Math.cos(md[0] * PI * y);
+
+  function updateSand(dt, t) {
+    // El tono dominante elige la figura; cambia con los golpes de bajo
+    const c = cNorm;
+    if (drive > 0.15 && blend >= 1 && t - lastSwitch > 2 && (beat || t - lastSwitch > 6)) {
+      const cur = MODES.indexOf(modeB);
+      let idx = Math.round(c * (MODES.length * 0.6 - 1));
+      if (Math.abs(idx - cur) < 1) idx = cur + (Math.random() < 0.5 ? -2 : 2);
+      idx = Math.max(0, Math.min(MODES.length - 1, idx));
+      modeA = modeB; modeB = MODES[idx]; blend = 0; lastSwitch = t;
+    }
+    blend = Math.min(1, blend + dt * 1.5);
+
+    const vib = drive;
+    // En silencio la arena se va desparramando poco a poco por toda la placa
+    const scatter = silence * silence * 0.012;
+    if (vib < 0.003 && scatter < 0.0005) return;
+    const k = 0.022 * vib, base = 0.0004 * vib + scatter;
+    for (let i = 0; i < NP * 2; i += 2) {
+      let x = grains[i], y = grains[i + 1];
+      let f = chladni(modeB, x, y);
+      if (blend < 1) f = f * blend + chladni(modeA, x, y) * (1 - blend);
+      const s = Math.abs(f) * k + base;
+      x += (Math.random() * 2 - 1) * s;
+      y += (Math.random() * 2 - 1) * s;
+      if (x > 1) x = 2 - x; else if (x < -1) x = -2 - x;
+      if (y > 1) y = 2 - y; else if (y < -1) y = -2 - y;
+      grains[i] = x; grains[i + 1] = y;
+    }
+  }
+
+  // ---------- Modo gota (ferrofluido en una placa, visto desde arriba) ----------
+  // Física simple: un imán en el centro atrae las gotas, la tensión superficial las une al tocarse
+  // y, con sonido, el campo las hace repelerse (como dipolos) y los golpes de bajo desprenden gotitas.
+  const MAXB = 32;
+  const drops = [{ x: 0, y: 0, vx: 0, vy: 0, m: 1 }];
+  const dropB = new Float32Array(MAXB * 4), dropS = new Float32Array(MAXB * 4);
+  const radiusOf = m => 0.34 * Math.sqrt(m);
+  let lastSplit = 0, texAmt = 0, irid = 0.3, wob = 0, spread = 0;
+  // "Locura": sube con bajo pesado sostenido (un drop de dubstep) y baja despacio
+  let hype = 0, shake = 0, prevBass = 0, magPhase = 0, rip = 0;
+
+  function splitDrop(strength) {
+    let big = drops[0];
+    for (const d of drops) if (d.m > big.m) big = d;
+    if (big.m < 0.08) return;
+    const n = 1 + Math.floor(Math.random() * (1 + strength * 3));
+    for (let k = 0; k < n && drops.length < MAXB; k++) {
+      // Si la gota principal ya está chica, suelta menos (para que siga dominando)
+      const frac = (0.012 + Math.random() * 0.05 * strength) * Math.min(1, big.m * 2);
+      const m = big.m * frac;
+      const a = Math.random() * Math.PI * 2, cx = Math.cos(a), cy = Math.sin(a);
+      const rb = radiusOf(big.m), rc = radiusOf(m);
+      const sp = 0.7 + strength * 1.3 + Math.random() * 0.5;
+      drops.push({ x: big.x + cx * (rb + rc * 0.3), y: big.y + cy * (rb + rc * 0.3), vx: big.vx + cx * sp, vy: big.vy + cy * sp, m });
+      big.m -= m;
+      big.vx -= cx * sp * frac; big.vy -= cy * sp * frac;
+    }
+  }
+
+  let dancePhase = 0, pulse = 0, wobT = 0, ripT = 0, spk = 1, sharp = 2;
+  function updateDrops(dt, t) {
+    // Ánimo detectado (se mezclan suavemente): A = agresivo, C = chill, D = bailable
+    // (al cuadrado y normalizado: el ánimo dominante se nota más)
+    const M = mood, s2 = M.agresivo ** 2 + M.chill ** 2 + M.bailable ** 2;
+    const A = M.agresivo ** 2 / s2, C = M.chill ** 2 / s2, D = M.bailable ** 2 / s2;
+    spread += (Math.min(1, drive) - spread) * 0.04;
+    texAmt += (Math.min(1, high * 3) * (0.3 + A) - texAmt) * 0.08;
+    irid += (Math.min(1, 0.25 + level * 1.5) - irid) * 0.05;
+    // La "locura" sólo crece si la música suena agresiva
+    const hypeT = Math.min(1, Math.max(0, (bass * 1.3 + drive * 0.6 - 0.85) * 2.5)) * Math.min(1, A * 1.6);
+    hype += (hypeT - hype) * (hypeT > hype ? 0.02 : 0.004);
+    // Wobble: cambios rápidos del bajo sacuden la gota (no en chill)
+    const dBass = Math.abs(bass - prevBass) / Math.max(dt, 1e-3); prevBass = bass;
+    shake += (Math.min(1.5, dBass * 0.25) * (0.15 + A) - shake) * 0.3;
+    // Chill: ondulación grande y lenta tipo lámpara de lava
+    wob += (Math.min(1, (bass * 1.5 + hype * 0.6) * (0.5 + 0.5 * A) + C * drive * 0.9) - wob) * 0.06;
+    rip += (Math.min(1.5, (bass * 1.5 + shake * 0.5 + hype) * (0.35 + A * 0.8 + D * 0.4)) - rip) * 0.15;
+    wobT += dt * (3.0 - C * 2.2);
+    ripT += dt * (24 - C * 16);
+    spk += ((0.45 * C + 0.85 * D + 1.1 * A) - spk) * 0.05;
+    sharp += ((1.3 * C + 2.0 * D + 2.6 * A) - sharp) * 0.05;
+    // Bailable: late en cada golpe
+    if (beat) pulse = 1;
+    pulse *= Math.exp(-dt * 7);
+
+    const cooldown = 0.2 - hype * 0.13 + C * 0.9;
+    if (beat && drive > 0.12 && t - lastSplit > cooldown && Math.random() < A + D * 0.6 + C * 0.15) {
+      splitDrop(Math.min(1.6, (drive + hype * 0.7) * (0.35 + A * 0.8 + D * 0.5))); lastSplit = t;
+    }
+    if (high > 0.2 && Math.random() < high * 0.04 * (A + D * 0.5)) splitDrop(0.15);
+    if (hype > 0.4 && drops.length < 24 && Math.random() < hype * 0.04) splitDrop(0.5 + hype * 0.5);
+
+    magPhase += dt * (0.35 * C + 0.8 * D + (1 + hype * 3.5) * A);
+    const amp = 0.2 * spread * (0.8 * C + 0.4 * D + A) + 0.25 * hype;
+    const jx = (Math.random() - 0.5) * shake * 0.12, jy = (Math.random() - 0.5) * shake * 0.12;
+    let mx = amp * Math.sin(magPhase * 0.31 + Math.sin(magPhase * 0.13) * 2) + jx;
+    let my = amp * Math.cos(magPhase * 0.27 + Math.sin(magPhase * 0.17) * 2) + jy;
+    // Bailable: vaivén de lado a lado al tempo detectado
+    let bpm = moodDet.bpm || 120;
+    while (bpm > 140) bpm /= 2;
+    while (bpm < 80) bpm *= 2;
+    dancePhase += dt * bpm / 60 * Math.PI;
+    const sway = D * spread * 0.17;
+    mx += sway * Math.sin(dancePhase);
+    my += sway * 0.4 * Math.abs(Math.cos(dancePhase));
+    // Agresivo: remolino errático. Bailable: las gotitas giran en ronda.
+    const swirl = (1.5 * mid + hype * 2.5) * Math.sin(t * 0.09 + 1.0) * (A + C * 0.4) + D * spread * 1.2;
+    const repK = 0.45 * (1 + hype * 0.8) * (0.6 + D * 0.6 + A * 0.5) * (1 - C * 0.75);
+    const springK = 2.5 * (1 - C * 0.4), dampK = 2.2 + C * 2.0;
+    const steps = 3, h = Math.min(dt, 0.05) / steps;
+    for (let s = 0; s < steps; s++) {
+      for (const d of drops) {
+        d.r = radiusOf(d.m);
+        d.ax = (mx - d.x) * springK - (d.y - my) * swirl;
+        d.ay = (my - d.y) * springK + (d.x - mx) * swirl;
+      }
+      for (let i = 0; i < drops.length; i++) for (let j = i + 1; j < drops.length; j++) {
+        const a = drops[i], b = drops[j];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        const dist = Math.hypot(dx, dy) + 1e-6;
+        dx /= dist; dy /= dist;
+        const reach = (a.r + b.r) * 1.15;
+        const coh = dist < reach ? 8 * (1 - dist / reach) + 1.5 : 0;   // tensión superficial
+        const rep = repK * spread / (dist * dist + 0.02);                // repulsión magnética
+        const ma = coh * b.m / (a.m + b.m) - rep * b.m;
+        const mb = coh * a.m / (a.m + b.m) - rep * a.m;
+        a.ax += dx * ma; a.ay += dy * ma;
+        b.ax -= dx * mb; b.ay -= dy * mb;
+      }
+      const damp = Math.exp(-dampK * h);
+      for (const d of drops) {
+        d.vx = (d.vx + d.ax * h) * damp;
+        d.vy = (d.vy + d.ay * h) * damp;
+        d.x += d.vx * h; d.y += d.vy * h;
+        const rr = Math.hypot(d.x, d.y), lim = 0.9 - d.r;
+        if (rr > lim) {
+          const nx = d.x / rr, ny = d.y / rr, vn = d.vx * nx + d.vy * ny;
+          d.x = nx * lim; d.y = ny * lim;
+          if (vn > 0) { d.vx -= 1.3 * vn * nx; d.vy -= 1.3 * vn * ny; }
+        }
+      }
+      // Fusión de gotas que se superponen
+      for (let i = 0; i < drops.length; i++) for (let j = drops.length - 1; j > i; j--) {
+        const a = drops[i], b = drops[j];
+        if (Math.hypot(b.x - a.x, b.y - a.y) < (a.r + b.r) * 0.55) {
+          const m = a.m + b.m;
+          a.x = (a.x * a.m + b.x * b.m) / m; a.y = (a.y * a.m + b.y * b.m) / m;
+          a.vx = (a.vx * a.m + b.vx * b.m) / m; a.vy = (a.vy * a.m + b.vy * b.m) / m;
+          a.m = m; a.r = radiusOf(m);
+          drops.splice(j, 1);
+        }
+      }
+    }
+  }
+
+  function drawDrops(t, th) {
+    const P = dropP;
+    gl.disable(gl.BLEND);
+    gl.useProgram(P.p);
+    dropB.fill(0); dropS.fill(0);
+    const beatScale = 1 + pulse * 0.07 * mood.bailable;
+    drops.forEach((d, i) => {
+      const sp = Math.hypot(d.vx, d.vy);
+      dropB[i * 4] = d.x; dropB[i * 4 + 1] = d.y; dropB[i * 4 + 2] = radiusOf(d.m) * beatScale;
+      dropS[i * 4] = sp > 1e-4 ? d.vx / sp : 1; dropS[i * 4 + 1] = sp > 1e-4 ? d.vy / sp : 0;
+      dropS[i * 4 + 2] = 1 + Math.min(0.7, sp * 0.5);
+    });
+    gl.uniform4fv(P.u.uB, dropB);
+    gl.uniform4fv(P.u.uS, dropS);
+    let big = drops[0];
+    for (const d of drops) if (d.m > big.m) big = d;
+    gl.uniform3f(P.u.uMain, big.x, big.y, radiusOf(big.m));
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, NB, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, texData);
+    gl.uniform1i(P.u.uBands, 0);
+    gl.uniform1f(P.u.uRip, rip);
+    gl.uniform1f(P.u.uHype, hype);
+    gl.uniform1f(P.u.uWobT, wobT);
+    gl.uniform1f(P.u.uRipT, ripT);
+    gl.uniform1f(P.u.uSpk, spk);
+    gl.uniform1f(P.u.uSharp, sharp);
+    gl.uniform2f(P.u.uRes, canvas.width, canvas.height);
+    gl.uniform1f(P.u.uDish, 0.46 * Math.min(canvas.width, canvas.height));
+    gl.uniform1f(P.u.uTime, t);
+    gl.uniform1f(P.u.uLevel, level);
+    gl.uniform1f(P.u.uTex, texAmt);
+    gl.uniform1f(P.u.uIrid, irid);
+    gl.uniform1f(P.u.uWob, wob);
+    gl.uniform3fv(P.u.uColA, th[0]);
+    gl.uniform3fv(P.u.uColB, th[1]);
+    drawFull();
+  }
+
+  // ---------- Rotación ----------
+  let yaw = 0.4, pitch = 0.3, dragging = false, lx = 0, ly = 0;
+  canvas.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointerup', () => dragging = false);
+  canvas.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    yaw += (e.clientX - lx) * 0.006;
+    pitch += (e.clientY - ly) * 0.006;
+    lx = e.clientX; ly = e.clientY;
+  });
+
+  // mundo -> objeto: Rx(pitch) * Ry(yaw); devuelve [columnas para GL, función para aplicar]
+  function rotation(a, b) {
+    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+    const M = [
+      [ca, 0, sa],
+      [sb * sa, cb, -sb * ca],
+      [-cb * sa, sb, cb * ca],
+    ];
+    const cols = new Float32Array([M[0][0], M[1][0], M[2][0], M[0][1], M[1][1], M[2][1], M[0][2], M[1][2], M[2][2]]);
+    const apply = v => M.map(r => r[0] * v[0] + r[1] * v[1] + r[2] * v[2]);
+    return [cols, apply];
+  }
+
+  // ---------- Bucle ----------
+  const t0 = performance.now();
+  let lastFrame = t0;
+  function drawFull(prog) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, triBuf);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  let frameCount = 0;
+  function frame(now) {
+    const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
+    const t = (now - t0) / 1000;
+    resize();
+    updateAudio(now);
+    updateMood(dt);
+    const th = currentTheme();
+    if ((frameCount = (frameCount + 1) % 30) === 0) {
+      const m = mood, top = Object.keys(m).reduce((a, b) => m[a] > m[b] ? a : b);
+      $('#moodTag').textContent = source === 'none' ? '' :
+        { agresivo: '🔥 agresivo', chill: '🌙 chill', bailable: '💃 bailable' }[top] + ` ${Math.round(m[top] * 100)}%`
+        + (ESS.ready && ESS.agg !== null ? ' · 🧠' : settings.ai && ESS.worker && !ESS.ready ? ' · 🧠 cargando…' : '');
+    }
+
+    if (settings.mode === 'sphere') {
+      const M = mood;
+      if (settings.rotate && !dragging) yaw += dt * 0.12 * (0.5 * M.chill + M.bailable + 1.8 * M.agresivo);
+      gl.disable(gl.BLEND);
+      const P = sphereP;
+      gl.useProgram(P.p);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, NB, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, texData);
+      gl.uniform1i(P.u.uBands, 0);
+      const [rot, apply] = rotation(yaw, pitch);
+      const mw = [Math.sin(t * 0.23), 0.5 * Math.sin(t * 0.13), Math.cos(t * 0.23)];
+      const ml = Math.hypot(...mw);
+      gl.uniform2f(P.u.uRes, canvas.width, canvas.height);
+      gl.uniform1f(P.u.uTime, t);
+      gl.uniform1f(P.u.uLevel, level);
+      gl.uniform1f(P.u.uBass, bass);
+      gl.uniform1f(P.u.uMid, mid);
+      gl.uniform3fv(P.u.uColA, th[0]);
+      gl.uniform3fv(P.u.uColB, th[1]);
+      gl.uniformMatrix3fv(P.u.uRot, false, rot);
+      gl.uniform3fv(P.u.uMag, apply(mw.map(v => v / ml)));
+      drawFull(P);
+    } else if (settings.mode === 'drop') {
+      updateDrops(dt, t);
+      drawDrops(t, th);
+    } else {
+      updateSand(dt, t);
+      const half = 0.42 * Math.min(canvas.width, canvas.height);
+      const sx = half / (canvas.width / 2), sy = half / (canvas.height / 2);
+      gl.disable(gl.BLEND);
+      gl.useProgram(plateP.p);
+      gl.uniform2f(plateP.u.uRes, canvas.width, canvas.height);
+      gl.uniform2f(plateP.u.uScale, sx, sy);
+      gl.uniform3fv(plateP.u.uColA, th[0]);
+      gl.uniform3fv(plateP.u.uColB, th[1]);
+      gl.uniform1f(plateP.u.uLevel, level);
+      drawFull(plateP);
+
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      gl.useProgram(sandP.p);
+      gl.uniform2f(sandP.u.uScale, sx, sy);
+      gl.uniform1f(sandP.u.uSize, Math.max(1, 1.5 * dpr * settings.quality));
+      const sand = [1.0, 0.86, 0.62];
+      gl.uniform3fv(sandP.u.uCol, sand.map((v, i) => (v * 0.65 + th[0][i] * 0.35) * 0.42));
+      gl.bindBuffer(gl.ARRAY_BUFFER, grainBuf);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, grains);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.POINTS, 0, NP);
+    }
+    if (debug) { const e = $('#err'); e.style.display = 'block'; e.textContent = `t=${t.toFixed(1)} lvl=${level.toFixed(3)} bass=${bass.toFixed(3)} mid=${mid.toFixed(3)} drive=${drive.toFixed(3)} locura=${hype.toFixed(2)} | A=${mood.agresivo.toFixed(2)} C=${mood.chill.toFixed(2)} B=${mood.bailable.toFixed(2)}`; }
+    requestAnimationFrame(frame);
+  }
+  const debug = params.has('debug');
+  function warmUp() { // pruebas: simula unos segundos antes del primer cuadro
+    if (source === 'none') source = 'demo';
+    lastT = 0;
+    for (let i = 1; i <= +params.get('warm'); i++) {
+      updateAudio(i * 16.67);
+      updateMood(1 / 60);
+      if (settings.mode === 'sand') updateSand(1 / 60, i / 60);
+      if (settings.mode === 'drop') updateDrops(1 / 60, i / 60);
+    }
+    lastT = performance.now();
+    requestAnimationFrame(frame);
+  }
+  // Los parámetros de prueba que cargan scripts sólo funcionan abriendo el archivo local,
+  // nunca en la versión publicada (evita que un link ejecute código ajeno en la página).
+  const localTest = location.protocol === 'file:';
+  if (localTest && params.has('esstest')) { // pruebas: ?esstest=archivo.js define window.__ESS16 = { nombre: Float32Array a 16 kHz }
+    const s = document.createElement('script');
+    s.src = params.get('esstest');
+    s.onload = () => {
+      const box = $('#err'), out = [], queue = Object.entries(window.__ESS16), t0 = performance.now();
+      box.style.display = 'block'; box.style.whiteSpace = 'pre';
+      let cur = '';
+      const next = () => {
+        const q = queue.shift();
+        if (!q) { out.push('LISTO'); box.textContent = `backend ${ESS.backend}\n` + out.join('\n'); return; }
+        cur = q[0]; ESS.busy = true; ESS.worker.postMessage(q[1]);
+      };
+      ESS.onPred = d => {
+        out.push(`${cur}: agresivo ${d.mood_aggressive.toFixed(2)}  relajado ${d.mood_relaxed.toFixed(2)}  bailable ${d.danceability.toFixed(2)}  (${d.ms | 0} ms)`);
+        next();
+      };
+      settings.ai = true; startEssentia();
+      const wait = setInterval(() => {
+        box.textContent = `cargando ${((performance.now() - t0) / 1000).toFixed(0)} s… ${ESS.lastErr || ''}`;
+        if (ESS.ready) { clearInterval(wait); box.textContent = `cargado en ${((performance.now() - t0) / 1000).toFixed(1)} s`; out.push(box.textContent); next(); }
+        if (ESS.failed) { clearInterval(wait); box.textContent = 'FALLÓ: ' + (ESS.lastErr || 'worker'); }
+      }, 250);
+    };
+    document.head.appendChild(s);
+  }
+  if (localTest && params.has('song')) { // pruebas: ?song=archivo.js define window.__SONG = { frames, data: Uint8Array }
+    const s = document.createElement('script');
+    s.src = params.get('song');
+    s.onload = () => { source = 'song'; warmUp(); };
+    document.head.appendChild(s);
+  } else if (params.has('warm')) warmUp();
+  else requestAnimationFrame(frame);
+
+  // ---------- Interfaz ----------
+  const bar = $('#bar'), start = $('#start');
+  let uiHidden = false, idleTimer = 0;
+  function setStatus(s) { $('#status').textContent = s; }
+  function started(silent) {
+    start.classList.add('hidden');
+    if (!silent && !wallpaperMode) poke();
+  }
+  function poke() {
+    if (uiHidden || wallpaperMode || !start.classList.contains('hidden')) return;
+    bar.classList.remove('hidden'); document.body.classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (!bar.matches(':hover')) { bar.classList.add('hidden'); document.body.classList.add('idle'); } }, 2500);
+  }
+  addEventListener('pointermove', poke);
+  if (wallpaperMode) { start.classList.add('hidden'); startDemo(); }
+
+  function setMode(m) {
+    settings.mode = m; save();
+    $('#mode').value = m;
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  }
+  setMode(settings.mode);
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  $('#mode').addEventListener('change', e => setMode(e.target.value));
+
+  document.querySelectorAll('[data-src]').forEach(b => b.addEventListener('click', () => {
+    ({ mic: startMic, system: startSystem, demo: startDemo })[b.dataset.src]();
+  }));
+  // En celulares y tablets no se puede capturar el audio del sistema: el micrófono pasa a ser la opción principal
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    document.querySelectorAll('[data-src="system"]').forEach(b => b.remove());
+    const mic = $('#start [data-src="mic"]');
+    if (mic) mic.classList.add('primary');
+  }
+  document.querySelectorAll('.filein').forEach(i => i.addEventListener('change', () => { startFile(i.files[0]); i.value = ''; }));
+
+  const applyTheme = () => document.documentElement.style.setProperty('--accent', settings.theme === 'mood' ? moodTheme[2] : (THEMES[settings.theme] || THEMES.neon)[2]);
+  $('#theme').value = settings.theme; applyTheme();
+  $('#theme').addEventListener('change', e => { settings.theme = e.target.value; applyTheme(); save(); });
+  $('#sens').value = settings.sens;
+  $('#sens').addEventListener('input', e => { settings.sens = +e.target.value; save(); });
+  $('#quality').value = String(settings.quality);
+  $('#quality').addEventListener('change', e => { settings.quality = +e.target.value; save(); });
+  const aiBtn = $('#ai');
+  const paintAi = () => aiBtn.style.opacity = settings.ai ? 1 : 0.45;
+  paintAi();
+  aiBtn.addEventListener('click', () => {
+    settings.ai = !settings.ai; paintAi(); save();
+    if (settings.ai) { ESS.failed = false; tapEssentia(); if (essTap) startEssentia(); }
+    else if (ESS.worker) { ESS.worker.terminate(); Object.assign(ESS, { worker: null, ready: false, busy: false, agg: null, dance: null, relax: null }); }
+  });
+  const rotBtn = $('#rot');
+  const paintRot = () => rotBtn.style.opacity = settings.rotate ? 1 : 0.45;
+  paintRot();
+  rotBtn.addEventListener('click', () => { settings.rotate = !settings.rotate; paintRot(); save(); });
+
+  const toggleFs = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
+  $('#fs').addEventListener('click', toggleFs);
+  addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (k === 'f') toggleFs();
+    if (k === 'm') setMode(MODE_LIST[(MODE_LIST.indexOf(settings.mode) + 1) % MODE_LIST.length]);
+    if (k === 'h') { uiHidden = !uiHidden; bar.classList.toggle('hidden', uiHidden); if (!uiHidden) poke(); }
+  });
+})();
+</script>
+</body>
+</html>
