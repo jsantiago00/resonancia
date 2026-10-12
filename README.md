@@ -2,7 +2,7 @@
 
 Visualizador de música que reacciona al sonido como materia real: una esfera de ferrofluido, una gota de ferrofluido sobre una placa y figuras de Chladni (arena sobre un parlante).
 
-**Abrir la app:** https://jsantiago00.github.io/resonancia/
+**Abrir la app:** https://santiagososa.com.ar/resonancia/
 
 ## Modos
 
