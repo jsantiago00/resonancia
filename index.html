@@ -118,6 +118,7 @@
   </select>
   <span class="sl">Sensib. <input type="range" id="sens" min="0.3" max="2.5" step="0.05" value="1"></span>
   <select id="quality" title="Calidad">
+    <option value="auto">⚡ Auto</option>
     <option value="0.5">Rápido</option>
     <option value="0.75">Normal</option>
     <option value="1">Alta</option>
@@ -670,9 +671,12 @@ void main() {
     gold:   [[1.0, 0.72, 0.3], [1.0, 0.9, 0.7], '#e8b04a'],
     mono:   [[0.9, 0.9, 0.95], [0.6, 0.6, 0.7], '#c8c8d0'],
   };
-  const settings = { mode: 'sphere', theme: 'mood', sens: 1, quality: 0.75, rotate: true, ai: true, outfit: 'remera' };
+  // Tablets y celulares: GPU más modesta y pantallas de 90-120 Hz -> menos carga por defecto
+  const isMobile = matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad/i.test(navigator.userAgent);
+  const settings = { mode: 'sphere', theme: 'mood', sens: 1, quality: 'auto', rotate: true, ai: !isMobile, outfit: 'remera' };
   try { Object.assign(settings, JSON.parse(localStorage.getItem('ferro-settings') || '{}')); } catch {}
   if (!settings.v2) { settings.theme = 'mood'; settings.v2 = true; } // estrena los colores según el ánimo
+  if (!settings.v3) { settings.quality = 'auto'; settings.v3 = true; if (isMobile) settings.ai = false; } // estrena la calidad automática
   // Colores por ánimo: agresivo = fuego, chill = azul/violeta, bailable = colores reggae
   const MOOD_COLORS = {
     agresivo: [[1.0, 0.12, 0.05], [1.0, 0.55, 0.0]],
@@ -754,10 +758,22 @@ void main() {
   const texData = new Uint8Array(NB);
 
   let dpr = 1;
+  // Calidad automática: baja o sube la resolución para mantener la fluidez (~60 fps)
+  let autoScale = isMobile ? 0.55 : 0.75, perfAcc = 0, perfFrames = 0, perfGood = 0;
+  const renderScale = () => settings.quality === 'auto' ? autoScale : settings.quality;
+  function tunePerf(intervalMs) {
+    if (settings.quality !== 'auto' || intervalMs > 250) return;     // ignora pausas (pestaña oculta, etc.)
+    perfAcc += intervalMs; perfFrames++;
+    if (perfAcc < 1000) return;
+    const avg = perfAcc / perfFrames;
+    perfAcc = 0; perfFrames = 0;
+    if (avg > 21) { autoScale = Math.max(0.3, autoScale * 0.85); perfGood = 0; }            // menos de ~48 fps
+    else if (avg < 17.6 && ++perfGood >= 3) { autoScale = Math.min(isMobile ? 0.8 : 1, autoScale * 1.08); perfGood = 0; }
+  }
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(1, Math.floor(innerWidth * dpr * settings.quality));
-    const h = Math.max(1, Math.floor(innerHeight * dpr * settings.quality));
+    dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2);
+    const w = Math.max(1, Math.floor(innerWidth * dpr * renderScale()));
+    const h = Math.max(1, Math.floor(innerHeight * dpr * renderScale()));
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     gl.viewport(0, 0, w, h);
   }
@@ -1174,7 +1190,7 @@ void main() {
   const MODES = [];
   for (let n = 1; n <= 8; n++) for (let m = n + 1; m <= 9; m++) { MODES.push([n, m, -1]); MODES.push([n, m, 1]); }
   MODES.sort((a, b) => (a[0] * a[0] + a[1] * a[1]) - (b[0] * b[0] + b[1] * b[1]));
-  const NP = 50000;
+  const NP = isMobile ? 22000 : 50000;
   const grains = new Float32Array(NP * 2);
   for (let i = 0; i < NP * 2; i++) grains[i] = Math.random() * 2 - 1;
   const grainBuf = gl.createBuffer();
@@ -1445,7 +1461,7 @@ void main() {
   }
 
   // ---------- Modo partículas (con estela) ----------
-  const NPART = 14000;
+  const NPART = isMobile ? 8000 : 14000;
   const parts = new Float32Array(NPART * 2), pvel = new Float32Array(NPART * 2), phue = new Float32Array(NPART);
   for (let i = 0; i < NPART; i++) {
     parts[i * 2] = (Math.random() * 2 - 1) * 1.8; parts[i * 2 + 1] = Math.random() * 2 - 1; phue[i] = Math.random();
@@ -1526,7 +1542,7 @@ void main() {
     gl.blendFunc(gl.ONE, gl.ONE);
     gl.useProgram(partP.p);
     gl.uniform1f(partP.u.uAsp, trail.w / trail.h);
-    gl.uniform1f(partP.u.uSize, Math.max(1.5, 2.6 * dpr * settings.quality));
+    gl.uniform1f(partP.u.uSize, Math.max(1.5, 2.6 * dpr * renderScale()));
     gl.uniform3fv(partP.u.uColA, th[0]); gl.uniform3fv(partP.u.uColB, th[1]);
     gl.uniform1f(partP.u.uBright, 0.6 + level * 1.4 + vis.pulse * 0.4);
     gl.bindBuffer(gl.ARRAY_BUFFER, partBuf);
@@ -1876,8 +1892,12 @@ void main() {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
-  let frameCount = 0;
+  let frameCount = 0, nextDraw = 0;
   function frame(now) {
+    // Tope de ~60 fps: en pantallas de 90-120 Hz salta cuadros sin perder el ritmo promedio
+    if (now < nextDraw - 3) { requestAnimationFrame(frame); return; }
+    nextDraw = now - nextDraw > 50 ? now + 16.67 : nextDraw + 16.67;
+    tunePerf(now - lastFrame);
     const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
     const t = (now - t0) / 1000;
     resize();
@@ -1946,7 +1966,7 @@ void main() {
       gl.blendFunc(gl.ONE, gl.ONE);
       gl.useProgram(sandP.p);
       gl.uniform2f(sandP.u.uScale, sx, sy);
-      gl.uniform1f(sandP.u.uSize, Math.max(1, 1.5 * dpr * settings.quality));
+      gl.uniform1f(sandP.u.uSize, Math.max(1, 1.5 * dpr * renderScale()));
       const sand = [1.0, 0.86, 0.62];
       gl.uniform3fv(sandP.u.uCol, sand.map((v, i) => (v * 0.65 + th[0][i] * 0.35) * 0.42));
       gl.bindBuffer(gl.ARRAY_BUFFER, grainBuf);
@@ -2070,7 +2090,7 @@ void main() {
   $('#sens').value = settings.sens;
   $('#sens').addEventListener('input', e => { settings.sens = +e.target.value; save(); });
   $('#quality').value = String(settings.quality);
-  $('#quality').addEventListener('change', e => { settings.quality = +e.target.value; save(); });
+  $('#quality').addEventListener('change', e => { settings.quality = e.target.value === 'auto' ? 'auto' : +e.target.value; save(); });
   const aiBtn = $('#ai');
   const paintAi = () => aiBtn.style.opacity = settings.ai ? 1 : 0.45;
   paintAi();
