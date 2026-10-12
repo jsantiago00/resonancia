@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Resonancia</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0a10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Resonancia">
 <style>
   :root {
     --glass: rgba(18, 18, 24, 0.55);
@@ -27,7 +34,7 @@
   .card h1 { margin: 0 0 6px; font-weight: 600; font-size: 28px; letter-spacing: .5px; }
   .card p { margin: 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
   .btns { display: grid; gap: 10px; }
-  .seg { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding: 4px; margin-bottom: 18px;
+  .seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; padding: 4px; margin-bottom: 18px;
     background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 14px; }
   .seg button { border: none; background: transparent; }
   .seg button.on { background: rgba(255,255,255,.14); }
@@ -67,6 +74,10 @@
       <button data-mode="sphere">⚫ Esfera</button>
       <button data-mode="drop">💧 Gota</button>
       <button data-mode="sand">⏹ Arena</button>
+      <button data-mode="ring">⭕ Anillo</button>
+      <button data-mode="tunnel">🌀 Túnel</button>
+      <button data-mode="particles">✨ Partículas</button>
+      <button data-mode="santi">🧑‍💻 Mini Santi</button>
     </div>
     <div class="btns">
       <button class="primary" data-src="system">🔊 Audio del PC / pestaña</button>
@@ -83,6 +94,10 @@
     <option value="sphere">⚫ Ferrofluido</option>
     <option value="drop">💧 Gota</option>
     <option value="sand">⏹ Arena</option>
+    <option value="ring">⭕ Anillo</option>
+    <option value="tunnel">🌀 Túnel</option>
+    <option value="particles">✨ Partículas</option>
+    <option value="santi">🧑‍💻 Mini Santi</option>
   </select>
   <button data-src="system" title="Audio del sistema">🔊</button>
   <button data-src="mic" title="Micrófono">🎤</button>
@@ -103,6 +118,7 @@
     <option value="1">Alta</option>
   </select>
   <button id="ai" title="IA de ánimo (Essentia): descarga ~13 MB la primera vez">🧠</button>
+  <button id="rot" title="Girar">⟳</button>
   <button id="fs" title="Pantalla completa">⛶</button>
   <span id="status">sin audio</span>
   <span id="moodTag" title="Ánimo detectado en la música" style="font-size:12px;color:var(--muted)"></span>
@@ -463,6 +479,177 @@ void main() {
 }
 </script>
 
+<!-- Modo anillo: espectro circular -->
+<script id="ring-fs" type="x-shader/x-fragment">
+precision highp float;
+uniform vec2 uRes;
+uniform float uTime;
+uniform sampler2D uBands;
+uniform float uLevel;
+uniform float uBass;
+uniform float uPulse;
+uniform float uRot;
+uniform float uA;
+uniform float uC;
+uniform float uD;
+uniform float uHype;
+uniform vec2 uShake;
+uniform vec3 uColA;
+uniform vec3 uColB;
+
+float band(float x) {
+  return texture2D(uBands, vec2(clamp(x, 0.0, 1.0) * (63.0 / 64.0) + 0.5 / 64.0, 0.5)).r;
+}
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+void main() {
+  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y + uShake;
+  float r = length(uv);
+  float ang = atan(uv.x, uv.y) + uRot;
+  ang = mod(ang + 3.14159, 6.28318) - 3.14159;
+  float x = abs(ang) / 3.14159;                 // espejado: graves arriba, agudos abajo
+  float N = 72.0;
+  float xs = (floor(x * N) + 0.5) / N;
+  float bBar = band(xs * 0.85);
+  float bSm = (band(x * 0.85 - 0.03) + band(x * 0.85) + band(x * 0.85 + 0.03)) / 3.0;
+  float b = mix(bBar, bSm, uC);                 // en chill: curva suave en vez de barras
+  float R = 0.2 + uBass * 0.04 + uPulse * 0.035 * (uD + uA);
+  float len = b * (0.22 + 0.12 * uA + uHype * 0.1);
+  float cell = fract(x * N);
+  float mask = mix(smoothstep(0.34, 0.22, abs(cell - 0.5)), 1.0, uC);
+  float inBar = step(R, r) * smoothstep(R + len + 0.004, R + len, r) * mask;
+
+  vec3 barCol = mix(uColA, uColB, clamp((r - R) / 0.3, 0.0, 1.0));
+  vec3 col = vec3(0.01, 0.01, 0.015);
+  col += mix(uColA, uColB, 0.5) * exp(-max(r - R, 0.0) * 5.0) * (0.04 + uLevel * 0.3);
+  col += barCol * inBar * 1.1;
+  col += barCol * mask * exp(-abs(r - (R + len)) * 90.0) * 0.6 * step(R, r);
+  // disco interior oscuro con un brillo suave que late
+  col = mix(col, vec3(0.0), smoothstep(R - 0.002, R - 0.01, r) * 0.92);
+  col += mix(uColA, uColB, 0.5) * exp(-(R - r) * 18.0) * step(r, R) * (0.08 + uPulse * 0.25);
+  col += mix(uColB, uColA, 0.5) * exp(-abs(r - R) * 160.0) * (0.6 + uPulse);
+  // onda expansiva en cada golpe
+  float ringR = R + (1.0 - uPulse) * 0.9;
+  col += mix(uColA, uColB, uPulse) * exp(-abs(r - ringR) * 110.0) * uPulse * (0.25 + uD + uA * 1.2);
+  // polvo de estrellas
+  vec2 g = floor(gl_FragCoord.xy / 3.0);
+  col += step(0.9985, hash(g)) * (0.2 + uLevel) * vec3(0.8, 0.85, 1.0);
+
+  col = 1.0 - exp(-col * 1.4);
+  col = pow(col, vec3(1.0 / 2.2));
+  vec2 vq = gl_FragCoord.xy / uRes;
+  col *= 0.45 + 0.55 * pow(16.0 * vq.x * vq.y * (1.0 - vq.x) * (1.0 - vq.y), 0.25);
+  gl_FragColor = vec4(col, 1.0);
+}
+</script>
+
+<!-- Modo túnel -->
+<script id="tunnel-fs" type="x-shader/x-fragment">
+precision highp float;
+uniform vec2 uRes;
+uniform float uTime;
+uniform sampler2D uBands;
+uniform float uLevel;
+uniform float uBass;
+uniform float uPulse;
+uniform float uTravel;
+uniform float uTwist;
+uniform float uA;
+uniform float uC;
+uniform float uD;
+uniform vec3 uColA;
+uniform vec3 uColB;
+
+float band(float x) {
+  return texture2D(uBands, vec2(clamp(x, 0.0, 1.0) * (63.0 / 64.0) + 0.5 / 64.0, 0.5)).r;
+}
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+void main() {
+  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  uv += vec2(sin(uTime * 0.4), cos(uTime * 0.3)) * 0.05 * (1.0 - uC * 0.6);
+  float r = max(length(uv), 0.015);
+  float a = atan(uv.y, uv.x);
+  float z = 0.35 / r + uTravel;
+  float aa = a / 6.28318 + 0.5 + uTwist * (0.35 / r) * 0.05;
+  float SEG = 16.0;
+  float zi = floor(z * 1.5), seg = floor(aa * SEG);
+  float fa = fract(aa * SEG), fz = fract(z * 1.5);
+  float edge = max(smoothstep(0.07, 0.0, min(fa, 1.0 - fa)), smoothstep(0.07, 0.0, min(fz, 1.0 - fz)));
+  // cada columna de paneles es una banda del espectro (simétrico)
+  float bnd = band(abs(fract((seg + 0.5) / SEG) - 0.5) * 2.0 * 0.85);
+  float flick = hash(vec2(seg, zi));
+  float panel = bnd * smoothstep(0.35, 0.9, flick * 0.7 + bnd * 0.6 + uA * 0.2 * hash(vec2(zi, floor(uTime * 12.0))));
+  vec3 c = mix(uColA, uColB, fract(zi * 0.17));
+  vec3 col = c * (edge * (0.2 + uLevel * 1.2) + panel * 0.7);
+  // chill: olas suaves en lugar de paneles
+  float wave = 0.5 + 0.5 * sin(z * 2.5 - uTime * 0.4 + sin(a * 3.0 + uTime * 0.2) * 1.5);
+  col = mix(col, c * wave * (0.12 + uLevel * 0.9 + bnd * 0.4), uC * 0.75);
+  // destello en cada golpe
+  col += c * uPulse * smoothstep(0.12, 0.0, min(fz, 1.0 - fz)) * (uD + uA) * 1.2;
+  // niebla al fondo y luz al final del túnel
+  col *= smoothstep(0.0, 0.3, r);
+  col += mix(uColB, vec3(1.0), 0.3) * exp(-r * 9.0) * (0.25 + uBass * 0.8);
+
+  col = 1.0 - exp(-col * 1.4);
+  col = pow(col, vec3(1.0 / 2.2));
+  vec2 vq = gl_FragCoord.xy / uRes;
+  col *= 0.5 + 0.5 * pow(16.0 * vq.x * vq.y * (1.0 - vq.x) * (1.0 - vq.y), 0.25);
+  gl_FragColor = vec4(col, 1.0);
+}
+</script>
+
+<!-- Modo partículas: estela (el cuadro anterior se desvanece con un leve zoom y giro) -->
+<script id="fade-fs" type="x-shader/x-fragment">
+precision mediump float;
+uniform sampler2D uT;
+uniform vec2 uRes;
+uniform float uFade;
+uniform float uZoom;
+uniform float uRotA;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  float asp = uRes.x / uRes.y;
+  vec2 c = uv - 0.5;
+  c.x *= asp;
+  float s = sin(uRotA), co = cos(uRotA);
+  c = mat2(co, -s, s, co) * c / (1.0 + uZoom);
+  c.x /= asp;
+  // el -1/255 evita que la estela quede "pegada" por el redondeo de 8 bits
+  gl_FragColor = vec4(max(texture2D(uT, c + 0.5).rgb * uFade - 1.0 / 255.0, 0.0), 1.0);
+}
+</script>
+<script id="blit-fs" type="x-shader/x-fragment">
+precision mediump float;
+uniform sampler2D uT;
+uniform vec2 uRes;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec3 col = texture2D(uT, uv).rgb;
+  col *= 0.5 + 0.5 * pow(16.0 * uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y), 0.25);
+  gl_FragColor = vec4(col, 1.0);
+}
+</script>
+<script id="part-vs" type="x-shader/x-vertex">
+attribute vec2 a;
+attribute float h;
+uniform float uAsp;
+uniform float uSize;
+varying float vH;
+void main() { vH = h; gl_Position = vec4(a.x / uAsp, a.y, 0.0, 1.0); gl_PointSize = uSize; }
+</script>
+<script id="part-fs" type="x-shader/x-fragment">
+precision mediump float;
+uniform vec3 uColA;
+uniform vec3 uColB;
+uniform float uBright;
+varying float vH;
+void main() {
+  float a = smoothstep(0.5, 0.1, length(gl_PointCoord - 0.5));
+  gl_FragColor = vec4(mix(uColA, uColB, vH) * a * uBright, 1.0);
+}
+</script>
+
 <script>
 (() => {
   const $ = s => document.querySelector(s);
@@ -501,7 +688,7 @@ void main() {
 
   const params = new URLSearchParams(location.search);
   const wallpaperMode = params.has('wallpaper');
-  const MODE_LIST = ['sphere', 'drop', 'sand'];
+  const MODE_LIST = ['sphere', 'drop', 'sand', 'ring', 'tunnel', 'particles', 'santi'];
   if (MODE_LIST.includes(params.get('mode'))) settings.mode = params.get('mode');
   if (!MODE_LIST.includes(settings.mode)) settings.mode = 'sphere';
 
@@ -522,13 +709,14 @@ void main() {
     gl.attachShader(p, compile(gl.VERTEX_SHADER, vsSrc));
     gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsSrc));
     gl.bindAttribLocation(p, 0, 'a');
+    gl.bindAttribLocation(p, 1, 'h');
     gl.linkProgram(p);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     const u = {};
     uniforms.forEach(n => u[n] = gl.getUniformLocation(p, n));
     return { p, u };
   }
-  let sphereP, plateP, sandP, dropP;
+  let sphereP, plateP, sandP, dropP, ringP, tunnelP, fadeP, blitP, partP;
   try {
     sphereP = program(FULL_VS, $('#sphere-fs').textContent,
       ['uRes', 'uTime', 'uBands', 'uLevel', 'uBass', 'uMid', 'uColA', 'uColB', 'uRot', 'uMag']);
@@ -537,6 +725,13 @@ void main() {
     dropP = program(FULL_VS, $('#drop-fs').textContent,
       ['uRes', 'uDish', 'uTime', 'uLevel', 'uTex', 'uIrid', 'uWob', 'uColA', 'uColB', 'uB', 'uS',
        'uBands', 'uMain', 'uRip', 'uHype', 'uWobT', 'uRipT', 'uSpk', 'uSharp']);
+    ringP = program(FULL_VS, $('#ring-fs').textContent, ['uRes', 'uTime', 'uBands', 'uLevel', 'uBass', 'uPulse', 'uRot',
+      'uA', 'uC', 'uD', 'uHype', 'uShake', 'uColA', 'uColB']);
+    tunnelP = program(FULL_VS, $('#tunnel-fs').textContent, ['uRes', 'uTime', 'uBands', 'uLevel', 'uBass', 'uPulse',
+      'uTravel', 'uTwist', 'uA', 'uC', 'uD', 'uColA', 'uColB']);
+    fadeP = program(FULL_VS, $('#fade-fs').textContent, ['uT', 'uRes', 'uFade', 'uZoom', 'uRotA']);
+    blitP = program(FULL_VS, $('#blit-fs').textContent, ['uT', 'uRes']);
+    partP = program($('#part-vs').textContent, $('#part-fs').textContent, ['uAsp', 'uSize', 'uColA', 'uColB', 'uBright']);
   } catch (e) { showErr('Error de gráficos: ' + e.message); console.error(e); return; }
 
   const triBuf = gl.createBuffer();
@@ -571,6 +766,7 @@ void main() {
   const noise = new Float32Array(NB).fill(1);
   let extTime = 0;
   const pos = new Float32Array(NB), vel = new Float32Array(NB);
+  let rawLoud = 0;
   let peak = 0.3, level = 0, bass = 0, mid = 0, high = 0, drive = 0, centroid = 0.3;
 
   function ensureCtx() {
@@ -905,6 +1101,9 @@ void main() {
     const t = now / 1000;
     const expo = readBands(t);
     const dtMs = Math.min(now - lastT, 100); lastT = now;
+    // Volumen absoluto (antes del control automático de ganancia): lo usa Mini Santi para medir ruido
+    let rl = 0; for (let i = 0; i < NB; i++) rl += raw[i];
+    rawLoud += (rl / NB - rawLoud) * Math.min(1, dtMs / 250);
     if (source !== 'none' && source !== 'analyser') {
       // (Con micrófono/sistema/archivo el detector usa su propio reloj; ver setInterval arriba.)
       // El detector espera 60 cuadros/s: si el navegador va más lento, interpola (repetir
@@ -1169,6 +1368,423 @@ void main() {
     drawFull();
   }
 
+  // ---------- Estado musical compartido por los modos anillo, túnel, partículas y Mini Santi ----------
+  const vis = { pulse: 0, phase: 0, A: 0.2, C: 0.6, D: 0.2, hype: 0, rot: 0, travel: 0, twist: 0 };
+  function updateVis(dt) {
+    const s2 = mood.agresivo ** 2 + mood.chill ** 2 + mood.bailable ** 2;
+    vis.A = mood.agresivo ** 2 / s2; vis.C = mood.chill ** 2 / s2; vis.D = mood.bailable ** 2 / s2;
+    if (beat) vis.pulse = 1;
+    vis.pulse *= Math.exp(-dt * 5);
+    let bpm = moodDet.bpm || 120;
+    while (bpm > 140) bpm /= 2;
+    while (bpm < 80) bpm *= 2;
+    vis.phase += dt * bpm / 60 * Math.PI;              // medio ciclo por pulso
+    const hT = Math.min(1, Math.max(0, (bass * 1.3 + drive * 0.6 - 0.85) * 2.5)) * Math.min(1, mood.agresivo * 1.6);
+    vis.hype += (hT - vis.hype) * (hT > vis.hype ? 0.02 : 0.004);
+  }
+  function bindBands(P) {
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, NB, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, texData);
+    gl.uniform1i(P.u.uBands, 0);
+  }
+
+  // ---------- Modo anillo ----------
+  function drawRing(dt, t, th) {
+    const { A, C, D } = vis;
+    vis.rot += dt * (0.04 * C + 0.12 * A * (1 + vis.hype * 2));
+    const P = ringP;
+    gl.disable(gl.BLEND);
+    gl.useProgram(P.p);
+    bindBands(P);
+    const sh = A * (vis.hype * 0.01 + vis.pulse * 0.006);
+    gl.uniform2f(P.u.uRes, canvas.width, canvas.height);
+    gl.uniform1f(P.u.uTime, t);
+    gl.uniform1f(P.u.uLevel, level);
+    gl.uniform1f(P.u.uBass, bass);
+    gl.uniform1f(P.u.uPulse, vis.pulse);
+    gl.uniform1f(P.u.uRot, vis.rot + D * 0.3 * Math.sin(vis.phase));
+    gl.uniform1f(P.u.uA, A); gl.uniform1f(P.u.uC, C); gl.uniform1f(P.u.uD, D);
+    gl.uniform1f(P.u.uHype, vis.hype);
+    gl.uniform2f(P.u.uShake, (Math.random() - 0.5) * sh, (Math.random() - 0.5) * sh);
+    gl.uniform3fv(P.u.uColA, th[0]); gl.uniform3fv(P.u.uColB, th[1]);
+    drawFull();
+  }
+
+  // ---------- Modo túnel ----------
+  function drawTunnel(dt, t, th) {
+    const { A, C, D } = vis;
+    vis.travel += dt * (0.25 + drive * (0.5 * C + 1.2 * D + 2.2 * A) + vis.hype * 3);
+    vis.twist += ((D * Math.sin(vis.phase) + Math.sin(t * 0.1) * 0.5 + A * (Math.random() - 0.5) * vis.pulse * 3) - vis.twist) * 0.1;
+    const P = tunnelP;
+    gl.disable(gl.BLEND);
+    gl.useProgram(P.p);
+    bindBands(P);
+    gl.uniform2f(P.u.uRes, canvas.width, canvas.height);
+    gl.uniform1f(P.u.uTime, t);
+    gl.uniform1f(P.u.uLevel, level);
+    gl.uniform1f(P.u.uBass, bass);
+    gl.uniform1f(P.u.uPulse, vis.pulse);
+    gl.uniform1f(P.u.uTravel, vis.travel);
+    gl.uniform1f(P.u.uTwist, vis.twist);
+    gl.uniform1f(P.u.uA, A); gl.uniform1f(P.u.uC, C); gl.uniform1f(P.u.uD, D);
+    gl.uniform3fv(P.u.uColA, th[0]); gl.uniform3fv(P.u.uColB, th[1]);
+    drawFull();
+  }
+
+  // ---------- Modo partículas (con estela) ----------
+  const NPART = 14000;
+  const parts = new Float32Array(NPART * 2), pvel = new Float32Array(NPART * 2), phue = new Float32Array(NPART);
+  for (let i = 0; i < NPART; i++) {
+    parts[i * 2] = (Math.random() * 2 - 1) * 1.8; parts[i * 2 + 1] = Math.random() * 2 - 1; phue[i] = Math.random();
+  }
+  const partBuf = gl.createBuffer(), hueBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, partBuf); gl.bufferData(gl.ARRAY_BUFFER, parts, gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, hueBuf); gl.bufferData(gl.ARRAY_BUFFER, phue, gl.STATIC_DRAW);
+  const trail = { tex: [], fbo: [], w: 0, h: 0, cur: 0 };
+  function ensureTrail() {
+    if (trail.w === canvas.width && trail.h === canvas.height) return;
+    trail.tex.forEach(t => gl.deleteTexture(t)); trail.fbo.forEach(f => gl.deleteFramebuffer(f));
+    trail.tex = []; trail.fbo = [];
+    for (let k = 0; k < 2; k++) {
+      const tx = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tx);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      const fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tx, 0);
+      gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+      trail.tex.push(tx); trail.fbo.push(fb);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    trail.w = canvas.width; trail.h = canvas.height;
+  }
+  function updateParticles(dt, t) {
+    const { A, C, D } = vis;
+    const asp = canvas.width / canvas.height;
+    const T = t * (0.15 + 0.25 * C + 0.4 * D + 0.6 * A);
+    const sp = 0.08 + drive * (0.25 * C + 0.45 * D + 0.8 * A) + vis.hype * 0.4;
+    const ringR = 0.45 + 0.15 * vis.pulse;
+    const burst = beat && A > 0.3 ? 1.6 * A * (0.5 + drive) : 0;   // agresivo: explosión en cada golpe
+    const decay = Math.exp(-dt * 3);
+    for (let i = 0; i < NPART; i++) {
+      let x = parts[i * 2], y = parts[i * 2 + 1];
+      let fx = Math.sin(y * 2.1 + T) + 0.5 * Math.cos(y * 3.7 - T * 0.7 + x);
+      let fy = Math.sin(x * 1.9 - T * 0.8) + 0.5 * Math.cos(x * 3.3 + T * 0.5 - y);
+      if (D > 0.05) {                                                // bailable: anillo que late y gira
+        const r = Math.hypot(x, y) + 1e-4, pull = (ringR - r) * 4 * D;
+        fx += (x / r) * pull - (y / r) * 1.4 * D;
+        fy += (y / r) * pull + (x / r) * 1.4 * D;
+      }
+      let vx = pvel[i * 2] * decay, vy = pvel[i * 2 + 1] * decay;
+      if (burst) {
+        const r = Math.hypot(x, y) + 0.05, k = burst * (0.4 + Math.random()) / r;
+        vx += x * k; vy += y * k;
+      }
+      pvel[i * 2] = vx; pvel[i * 2 + 1] = vy;
+      x += (fx * sp + vx) * dt; y += (fy * sp + vy) * dt;
+      if (Math.abs(x) > asp + 0.05 || Math.abs(y) > 1.05 || Math.random() < dt * 0.04) {
+        x = (Math.random() * 2 - 1) * asp; y = Math.random() * 2 - 1;
+        pvel[i * 2] = pvel[i * 2 + 1] = 0;
+      }
+      parts[i * 2] = x; parts[i * 2 + 1] = y;
+    }
+  }
+  function drawParticles(dt, t, th) {
+    const { A, C, D } = vis;
+    ensureTrail();
+    gl.disable(gl.BLEND);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, trail.fbo[1 - trail.cur]);
+    gl.viewport(0, 0, trail.w, trail.h);
+    gl.useProgram(fadeP.p);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, trail.tex[trail.cur]);
+    gl.uniform1i(fadeP.u.uT, 0);
+    gl.uniform2f(fadeP.u.uRes, trail.w, trail.h);
+    gl.uniform1f(fadeP.u.uFade, 0.9 + 0.07 * C - 0.05 * A);       // estelas largas en chill
+    gl.uniform1f(fadeP.u.uZoom, 0.002 + 0.004 * D + 0.012 * A * drive);
+    gl.uniform1f(fadeP.u.uRotA, 0.002 * C + 0.006 * D * Math.sin(vis.phase));
+    drawFull();
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    gl.useProgram(partP.p);
+    gl.uniform1f(partP.u.uAsp, trail.w / trail.h);
+    gl.uniform1f(partP.u.uSize, Math.max(1.5, 2.6 * dpr * settings.quality));
+    gl.uniform3fv(partP.u.uColA, th[0]); gl.uniform3fv(partP.u.uColB, th[1]);
+    gl.uniform1f(partP.u.uBright, 0.6 + level * 1.4 + vis.pulse * 0.4);
+    gl.bindBuffer(gl.ARRAY_BUFFER, partBuf);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, parts);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, hueBuf);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.POINTS, 0, NPART);
+    gl.disableVertexAttribArray(1);
+    gl.disable(gl.BLEND);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(blitP.p);
+    gl.bindTexture(gl.TEXTURE_2D, trail.tex[1 - trail.cur]);
+    gl.uniform1i(blitP.u.uT, 0);
+    gl.uniform2f(blitP.u.uRes, canvas.width, canvas.height);
+    drawFull();
+    trail.cur = 1 - trail.cur;
+  }
+
+  // ---------- Modo Mini Santi: se estresa con el ruido ----------
+  // Para personalizarlo, cambiá estos colores (o activá anteojos / barba).
+  const SANTI = { piel: '#f1c6a1', pelo: '#2b1b12', remera: '#3567b0', anteojos: false, barba: false };
+  const c2 = document.createElement('canvas');
+  c2.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:none;z-index:1;pointer-events:none';
+  canvas.after(c2);
+  const g2 = c2.getContext('2d');
+  const santi = { stress: 0, blinkT: 2, blink: 0, phraseT: 0, phrase: '', bucket: -1, notes: [], puffs: [], drops: [], typeT: 0 };
+  const PHRASES = [
+    ['Todo tranqui ☕', 'Fluyendo 😌', 'Modo concentración', 'Qué temazo 🎶'],
+    ['Mmm…', 'Uff, un poquito de ruido', 'Concentrate, Santi…', 'Respirá hondo'],
+    ['Che, ¿bajan un poco?', '¿Quién hace tanto ruido?', 'No me puedo concentrar 😤', 'Así no se puede laburar'],
+    ['¡NO PUEDO PENSAR!', '¡SILENCIOOO!', 'Me voy a vivir al campo 🐄', '¡AAAAAH! 🤯'],
+  ];
+  const lerpCol = (a, b, k) => {
+    const pa = a.match(/\w\w/g).map(h => parseInt(h, 16)), pb = b.match(/\w\w/g).map(h => parseInt(h, 16));
+    return 'rgb(' + pa.map((v, i) => Math.round(v + (pb[i] - v) * k)).join(',') + ')';
+  };
+  const rgbOf = c => 'rgb(' + c.map(v => Math.round(Math.min(1, v) * 255)).join(',') + ')';
+  function rr(x, y, w, h, r) {
+    g2.beginPath();
+    g2.moveTo(x + r, y); g2.arcTo(x + w, y, x + w, y + h, r); g2.arcTo(x + w, y + h, x, y + h, r);
+    g2.arcTo(x, y + h, x, y, r); g2.arcTo(x, y, x + w, y, r); g2.closePath();
+  }
+
+  function updateSanti(dt, t) {
+    // Ruido = volumen absoluto por encima de un umbral de comodidad (lo mueve el control de sensibilidad)
+    const comfort = 0.4 - 0.08 * (settings.sens - 1);
+    const noise = Math.max(0, (rawLoud - comfort) / 0.22);
+    // La música chill/bailable lo estresa poco (la disfruta); la agresiva y el ruido, mucho
+    let target = Math.min(1, noise * (0.15 + vis.A * 1.3) + vis.hype * 0.3);
+    if (beat && rawLoud > comfort + 0.05) target = Math.min(1, target + 0.12 * (0.5 + vis.A));
+    if (source === 'none') target = 0;
+    // Se estresa rápido y se calma despacio
+    santi.stress = target > santi.stress ? Math.min(target, santi.stress + 0.35 * dt) : Math.max(target, santi.stress - 0.06 * dt);
+    santi.groove = source !== 'none' && drive > 0.1 ? Math.max(0, (vis.D + vis.C * 0.5) * Math.min(1, drive * 2) * (1 - santi.stress * 1.6)) : 0;
+    santi.blinkT -= dt;
+    if (santi.blinkT < 0) { santi.blink = 0.15; santi.blinkT = 2 + Math.random() * 3; }
+    santi.blink = Math.max(0, santi.blink - dt);
+    const bucket = santi.stress < 0.25 ? 0 : santi.stress < 0.5 ? 1 : santi.stress < 0.78 ? 2 : 3;
+    santi.phraseT -= dt;
+    if (bucket !== santi.bucket || santi.phraseT < 0) {
+      const list = PHRASES[bucket];
+      santi.phrase = bucket === 0 && santi.groove > 0.25 ? 'Qué temazo 🎶' : list[Math.floor(Math.random() * list.length)];
+      santi.bucket = bucket; santi.phraseT = 6 + Math.random() * 4;
+    }
+    santi.typeT += dt * (5 + santi.stress * 12);
+    // partículas: notas musicales, gotas de sudor, humo
+    if (santi.groove > 0.2 && Math.random() < dt * 1.5 * santi.groove) santi.notes.push({ x: (Math.random() - 0.5) * 160, y: 0, life: 1, ch: Math.random() < 0.5 ? '♪' : '♫' });
+    if (santi.stress > 0.45 && Math.random() < dt * 2 * santi.stress) santi.drops.push({ side: Math.random() < 0.5 ? -1 : 1, y: 0, life: 1 });
+    if (santi.stress > 0.72 && Math.random() < dt * 8 * santi.stress) santi.puffs.push({ x: (Math.random() - 0.5) * 70, y: 0, r: 8, life: 1 });
+    for (const n of santi.notes) { n.y -= dt * 45; n.x += Math.sin(t * 3 + n.y * 0.05) * dt * 20; n.life -= dt * 0.4; }
+    for (const d of santi.drops) { d.y += dt * 60; d.life -= dt * 0.9; }
+    for (const p of santi.puffs) { p.y -= dt * 70; p.r += dt * 22; p.life -= dt * 0.8; }
+    santi.notes = santi.notes.filter(n => n.life > 0);
+    santi.drops = santi.drops.filter(d => d.life > 0);
+    santi.puffs = santi.puffs.filter(p => p.life > 0);
+  }
+
+  function drawSanti(t, th) {
+    const w = Math.floor(innerWidth * dpr), h = Math.floor(innerHeight * dpr);
+    if (c2.width !== w || c2.height !== h) { c2.width = w; c2.height = h; }
+    const st = santi.stress, gr = santi.groove || 0;
+    const desk = h * 0.78;
+    const S = Math.min(w / 700, desk / 540);
+    const cx = w / 2;
+    g2.setTransform(1, 0, 0, 1, 0, 0);
+    // pared: azul noche tranquila -> rojo estrés
+    const bgG = g2.createLinearGradient(0, 0, 0, h);
+    bgG.addColorStop(0, lerpCol('1b2232', '3b1212', st));
+    bgG.addColorStop(1, lerpCol('0e121b', '1c0707', st));
+    g2.fillStyle = bgG; g2.fillRect(0, 0, w, h);
+    // reloj de pared con la hora real
+    const now = new Date(), clx = cx - 220 * S, cly = h * 0.2;
+    g2.fillStyle = '#e8e4da'; g2.beginPath(); g2.arc(clx, cly, 34 * S, 0, 7); g2.fill();
+    g2.strokeStyle = '#333'; g2.lineWidth = 3 * S; g2.stroke();
+    const hand = (ang, len, wd) => { g2.lineWidth = wd * S; g2.beginPath(); g2.moveTo(clx, cly); g2.lineTo(clx + Math.sin(ang) * len * S, cly - Math.cos(ang) * len * S); g2.stroke(); };
+    hand((now.getHours() % 12 + now.getMinutes() / 60) / 12 * 6.283, 17, 4);
+    hand((now.getMinutes() + now.getSeconds() / 60) / 60 * 6.283, 26, 3);
+    g2.strokeStyle = '#c0392b'; hand(now.getSeconds() / 60 * 6.283, 28, 1.5);
+    // planta
+    g2.fillStyle = '#6b4226'; rr(cx + 200 * S, desk - 55 * S, 40 * S, 55 * S, 6 * S); g2.fill();
+    g2.fillStyle = lerpCol('3f9b5a', '7a6a2a', st);
+    for (let k = 0; k < 5; k++) { g2.beginPath(); g2.ellipse(cx + 220 * S + (k - 2) * 9 * S, desk - 70 * S - Math.abs(k - 2) * -6 * S, 9 * S, 26 * S, (k - 2) * 0.35, 0, 7); g2.fill(); }
+
+    // --- personaje ---
+    const shake = st > 0.75 ? (st - 0.75) * 4 : 0;
+    const ox = (Math.random() - 0.5) * shake * 8 * S, oy = (Math.random() - 0.5) * shake * 5 * S;
+    const bob = gr * Math.sin(vis.phase * 2) * 9 * S;
+    const hx = cx + ox, hy = desk - 235 * S + oy + bob;
+    // torso
+    g2.fillStyle = SANTI.remera; rr(cx - 95 * S + ox, desk - 165 * S + oy, 190 * S, 200 * S, 60 * S); g2.fill();
+    // cuello
+    g2.fillStyle = SANTI.piel; rr(hx - 18 * S, hy + 55 * S, 36 * S, 40 * S, 10 * S); g2.fill();
+    // brazos tecleando (detrás de la notebook)
+    const handsUp = st > 0.9;
+    if (!handsUp) {
+      for (const sd of [-1, 1]) {
+        const tap = Math.max(0, Math.sin(santi.typeT * 3.1 + (sd > 0 ? 1.6 : 0))) * (4 + st * 8) * S;
+        g2.strokeStyle = SANTI.remera; g2.lineWidth = 34 * S; g2.lineCap = 'round';
+        g2.beginPath(); g2.moveTo(cx + sd * 80 * S + ox, desk - 130 * S + oy);
+        g2.quadraticCurveTo(cx + sd * 120 * S + ox, desk - 40 * S, cx + sd * 55 * S + ox, desk - 20 * S - tap); g2.stroke();
+      }
+    }
+    // cabeza
+    const skin = lerpCol(SANTI.piel.slice(1), 'e0574a', st * 0.55);
+    g2.fillStyle = skin; g2.beginPath(); g2.ellipse(hx, hy, 70 * S, 76 * S, 0, 0, 7); g2.fill();
+    // orejas
+    g2.beginPath(); g2.ellipse(hx - 70 * S, hy + 5 * S, 12 * S, 18 * S, 0, 0, 7); g2.ellipse(hx + 70 * S, hy + 5 * S, 12 * S, 18 * S, 0, 0, 7); g2.fill();
+    // pelo (se para con el estrés)
+    g2.fillStyle = SANTI.pelo;
+    g2.beginPath(); g2.ellipse(hx, hy - 45 * S, 72 * S, 40 * S, 0, Math.PI, 0); g2.fill();
+    const spikes = 9, sh = (8 + st * st * 40) * S;
+    g2.beginPath();
+    for (let k = 0; k <= spikes; k++) {
+      const a = Math.PI + (k / spikes) * Math.PI, rx = 70 * S, ry = 42 * S;
+      const bx = hx + Math.cos(a) * rx, by = hy - 45 * S + Math.sin(a) * ry;
+      const jitter = st > 0.6 ? Math.sin(t * 30 + k) * 3 * S : 0;
+      if (k === 0) g2.moveTo(bx, by);
+      const ma = a + Math.PI / spikes / 2;
+      g2.lineTo(hx + Math.cos(ma) * (rx + sh) + jitter, hy - 45 * S + Math.sin(ma) * (ry + sh));
+      g2.lineTo(bx, by);
+    }
+    g2.fill();
+    if (SANTI.barba) { g2.fillStyle = SANTI.pelo; g2.globalAlpha = 0.85; g2.beginPath(); g2.ellipse(hx, hy + 45 * S, 52 * S, 34 * S, 0, 0, Math.PI); g2.fill(); g2.globalAlpha = 1; }
+    // cachetes
+    g2.fillStyle = `rgba(230,80,80,${0.15 + st * 0.45})`;
+    g2.beginPath(); g2.ellipse(hx - 40 * S, hy + 18 * S, 13 * S, 8 * S, 0, 0, 7); g2.ellipse(hx + 40 * S, hy + 18 * S, 13 * S, 8 * S, 0, 0, 7); g2.fill();
+    // cejas
+    const browA = st * 0.55;
+    g2.strokeStyle = SANTI.pelo; g2.lineWidth = 6 * S; g2.lineCap = 'round';
+    for (const sd of [-1, 1]) {
+      g2.beginPath();
+      g2.moveTo(hx + sd * 40 * S, hy - 26 * S - (1 - st) * 4 * S);
+      g2.lineTo(hx + sd * 14 * S, hy - 26 * S + Math.sin(browA) * 14 * S * 1);
+      g2.stroke();
+    }
+    // ojos
+    g2.lineWidth = 4 * S;
+    for (const sd of [-1, 1]) {
+      const ex = hx + sd * 27 * S, ey = hy - 4 * S;
+      if (st > 0.85) {                                   // ojos espiral
+        g2.strokeStyle = '#222'; g2.beginPath();
+        for (let a = 0; a < 12; a += 0.3) { const r = a * 1.1 * S; g2.lineTo(ex + Math.cos(a + t * 8 * sd) * r, ey + Math.sin(a + t * 8 * sd) * r); }
+        g2.stroke();
+      } else if (gr > 0.45 && st < 0.25) {             // disfrutando: ojos cerrados ^^
+        g2.strokeStyle = '#222'; g2.beginPath(); g2.arc(ex, ey + 4 * S, 10 * S, Math.PI * 1.15, Math.PI * 1.85); g2.stroke();
+      } else if (santi.blink > 0) {
+        g2.strokeStyle = '#222'; g2.beginPath(); g2.moveTo(ex - 10 * S, ey); g2.lineTo(ex + 10 * S, ey); g2.stroke();
+      } else {
+        const open = st > 0.55 ? 1.25 : 1;
+        g2.fillStyle = '#fff'; g2.beginPath(); g2.ellipse(ex, ey, 12 * S * open, 13 * S * open, 0, 0, 7); g2.fill();
+        const pr = (st > 0.55 ? 3.5 : 6.5) * S, jit = st > 0.55 ? Math.sin(t * 40 + sd) * 2 * S : 0;
+        g2.fillStyle = '#222'; g2.beginPath(); g2.arc(ex + jit, ey + 2 * S, pr, 0, 7); g2.fill();
+        if (st > 0.25 && st <= 0.55) { g2.fillStyle = skin; g2.fillRect(ex - 14 * S, ey - 15 * S, 28 * S, 11 * S); }   // párpado cansado
+      }
+    }
+    if (SANTI.anteojos) {
+      g2.strokeStyle = '#222'; g2.lineWidth = 3.5 * S;
+      g2.beginPath(); g2.arc(hx - 27 * S, hy - 4 * S, 19 * S, 0, 7); g2.moveTo(hx + 46 * S, hy - 4 * S); g2.arc(hx + 27 * S, hy - 4 * S, 19 * S, 0, 7);
+      g2.moveTo(hx - 8 * S, hy - 6 * S); g2.lineTo(hx + 8 * S, hy - 6 * S); g2.stroke();
+    }
+    // boca
+    g2.strokeStyle = '#5a2a22'; g2.lineWidth = 5 * S;
+    const my = hy + 36 * S;
+    if (st < 0.2) { g2.beginPath(); g2.arc(hx, my - 10 * S, 20 * S, 0.2 * Math.PI, 0.8 * Math.PI); g2.stroke(); }
+    else if (st < 0.5) { g2.beginPath(); g2.moveTo(hx - 16 * S, my); g2.lineTo(hx + 16 * S, my); g2.stroke(); }
+    else if (st < 0.8) {
+      g2.beginPath();
+      for (let k = 0; k <= 6; k++) g2.lineTo(hx - 20 * S + k * (40 / 6) * S, my + (k % 2 ? -5 : 5) * S);
+      g2.stroke();
+    } else { g2.fillStyle = '#5a1a1a'; g2.beginPath(); g2.ellipse(hx, my + 4 * S, 18 * S, 14 * S + Math.sin(t * 20) * 3 * S, 0, 0, 7); g2.fill(); }
+    // auriculares cuando suena música y está bien
+    if (source !== 'none' && st < 0.5) {
+      const hc = rgbOf(th[0]);
+      g2.strokeStyle = '#222'; g2.lineWidth = 10 * S; g2.beginPath(); g2.arc(hx, hy - 10 * S, 80 * S, Math.PI * 1.05, Math.PI * 1.95); g2.stroke();
+      g2.fillStyle = hc;
+      rr(hx - 92 * S, hy - 22 * S, 24 * S, 46 * S, 10 * S); g2.fill();
+      rr(hx + 68 * S, hy - 22 * S, 24 * S, 46 * S, 10 * S); g2.fill();
+    }
+    // manos en la cabeza al máximo
+    if (handsUp) {
+      g2.strokeStyle = SANTI.remera; g2.lineWidth = 34 * S;
+      for (const sd of [-1, 1]) {
+        g2.beginPath(); g2.moveTo(cx + sd * 80 * S + ox, desk - 130 * S + oy); g2.quadraticCurveTo(cx + sd * 150 * S, hy, hx + sd * 60 * S, hy - 50 * S); g2.stroke();
+        g2.fillStyle = skin; g2.beginPath(); g2.arc(hx + sd * 60 * S, hy - 50 * S, 18 * S, 0, 7); g2.fill();
+      }
+    }
+    // sudor
+    g2.fillStyle = 'rgba(120,190,255,0.85)';
+    for (const d of santi.drops) {
+      const dx = hx + d.side * 66 * S, dy = hy - 20 * S + d.y * S;
+      g2.globalAlpha = d.life; g2.beginPath(); g2.moveTo(dx, dy - 10 * S); g2.quadraticCurveTo(dx + 7 * S, dy + 4 * S, dx, dy + 6 * S); g2.quadraticCurveTo(dx - 7 * S, dy + 4 * S, dx, dy - 10 * S); g2.fill();
+    }
+    // humo
+    for (const p of santi.puffs) {
+      g2.globalAlpha = p.life * 0.6; g2.fillStyle = '#ddd';
+      g2.beginPath(); g2.arc(hx + p.x * S, hy - 90 * S + p.y * S, p.r * S, 0, 7); g2.fill();
+    }
+    g2.globalAlpha = 1;
+
+    // escritorio
+    g2.fillStyle = '#5b3b26'; g2.fillRect(0, desk, w, h - desk);
+    g2.fillStyle = '#7a5235'; g2.fillRect(0, desk, w, 10 * S);
+    // notebook (vista de atrás) con logo que brilla con la música
+    g2.fillStyle = '#2a2d34'; rr(cx - 120 * S, desk - 150 * S, 240 * S, 150 * S, 10 * S); g2.fill();
+    g2.fillStyle = '#3a3e47'; g2.fillRect(cx - 140 * S, desk - 6 * S, 280 * S, 12 * S);
+    g2.fillStyle = rgbOf(th[1].map(v => v * (0.4 + level * 1.5 + vis.pulse * 0.4)));
+    g2.beginPath(); g2.arc(cx, desk - 80 * S, 18 * S, 0, 7); g2.fill();
+    // taza de café
+    const mx = cx + 175 * S;
+    g2.fillStyle = '#e9e4d8'; rr(mx, desk - 50 * S, 42 * S, 50 * S, 8 * S); g2.fill();
+    g2.strokeStyle = '#e9e4d8'; g2.lineWidth = 7 * S; g2.beginPath(); g2.arc(mx + 46 * S, desk - 26 * S, 12 * S, -1.2, 1.2); g2.stroke();
+    g2.strokeStyle = 'rgba(255,255,255,0.35)'; g2.lineWidth = 3 * S;
+    for (let k = 0; k < 2; k++) {
+      g2.beginPath();
+      for (let y = 0; y < 40; y += 4) g2.lineTo(mx + 14 * S + k * 14 * S + Math.sin(t * 2 + y * 0.2 + k) * 4 * S, desk - 58 * S - y * S);
+      g2.stroke();
+    }
+    // notas musicales
+    g2.font = `${28 * S}px sans-serif`; g2.textAlign = 'center';
+    for (const n of santi.notes) { g2.globalAlpha = n.life; g2.fillStyle = rgbOf(th[0]); g2.fillText(n.ch, hx + 95 * S + n.x * S * 0.4, hy - 40 * S + n.y * S); }
+    g2.globalAlpha = 1;
+
+    // globito
+    const bx = hx + 100 * S, by = hy - 115 * S;
+    g2.font = `600 ${20 * S}px "Segoe UI", system-ui, sans-serif`; g2.textAlign = 'left';
+    const tw = g2.measureText(santi.phrase).width;
+    const bw = Math.min(tw + 32 * S, w - 20 * S), bh = 46 * S;
+    // si no entra a la derecha de la cabeza (celu vertical), el globito va arriba
+    const fitsRight = bx + bw < w - 10 * S;
+    const bxx = fitsRight ? bx : Math.max(10 * S, cx - bw / 2);
+    const byy = fitsRight ? by : hy - 235 * S;
+    g2.fillStyle = st > 0.78 ? '#ffe1e1' : '#fff';
+    rr(bxx, byy, bw, bh, 18 * S); g2.fill();
+    const tip = fitsRight ? bxx + 24 * S : cx - 13 * S;
+    g2.beginPath(); g2.moveTo(tip, byy + bh - 2 * S); g2.lineTo(fitsRight ? hx + 50 * S : hx + 10 * S, fitsRight ? hy - 70 * S : hy - 150 * S); g2.lineTo(tip + 26 * S, byy + bh - 2 * S); g2.fill();
+    g2.fillStyle = '#222'; g2.fillText(santi.phrase, bxx + 16 * S, byy + 30 * S, bw - 24 * S);
+
+    // medidor de estrés
+    const mw = Math.min(360 * S, w * 0.8), mx2 = cx - mw / 2, my2 = 26 * S;
+    g2.fillStyle = 'rgba(255,255,255,0.08)'; rr(mx2, my2, mw, 22 * S, 11 * S); g2.fill();
+    const mc = st < 0.5 ? lerpCol('3ecf6e', 'f4c430', st * 2) : lerpCol('f4c430', 'ff3b30', (st - 0.5) * 2);
+    g2.fillStyle = mc; rr(mx2, my2, Math.max(22 * S, mw * st), 22 * S, 11 * S); g2.fill();
+    g2.fillStyle = 'rgba(255,255,255,0.75)'; g2.font = `600 ${15 * S}px "Segoe UI", system-ui, sans-serif`; g2.textAlign = 'center';
+    g2.fillText(`Estrés ${Math.round(st * 100)}%  ·  ruido ${Math.round(Math.min(1, rawLoud / 0.7) * 100)}%`, cx, my2 + 44 * S);
+  }
+
   // ---------- Rotación ----------
   let yaw = 0.4, pitch = 0.3, dragging = false, lx = 0, ly = 0;
   canvas.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
@@ -1208,6 +1824,8 @@ void main() {
     resize();
     updateAudio(now);
     updateMood(dt);
+    updateVis(dt);
+    c2.style.display = settings.mode === 'santi' ? 'block' : 'none';
     const th = currentTheme();
     if ((frameCount = (frameCount + 1) % 30) === 0) {
       const m = mood, top = Object.keys(m).reduce((a, b) => m[a] > m[b] ? a : b);
@@ -1242,6 +1860,16 @@ void main() {
     } else if (settings.mode === 'drop') {
       updateDrops(dt, t);
       drawDrops(t, th);
+    } else if (settings.mode === 'ring') {
+      drawRing(dt, t, th);
+    } else if (settings.mode === 'tunnel') {
+      drawTunnel(dt, t, th);
+    } else if (settings.mode === 'particles') {
+      updateParticles(dt, t);
+      drawParticles(dt, t, th);
+    } else if (settings.mode === 'santi') {
+      updateSanti(dt, t);
+      drawSanti(t, th);
     } else {
       updateSand(dt, t);
       const half = 0.42 * Math.min(canvas.width, canvas.height);
@@ -1279,6 +1907,9 @@ void main() {
       updateMood(1 / 60);
       if (settings.mode === 'sand') updateSand(1 / 60, i / 60);
       if (settings.mode === 'drop') updateDrops(1 / 60, i / 60);
+      updateVis(1 / 60);
+      if (settings.mode === 'particles') updateParticles(1 / 60, i / 60);
+      if (settings.mode === 'santi') updateSanti(1 / 60, i / 60);
     }
     lastT = performance.now();
     requestAnimationFrame(frame);
@@ -1326,7 +1957,20 @@ void main() {
   function started(silent) {
     start.classList.add('hidden');
     if (!silent && !wallpaperMode) poke();
+    keepAwake();
   }
+  // Que la pantalla del celu/tablet no se apague mientras la app está andando
+  let wakeLock = null;
+  async function keepAwake() {
+    if (!('wakeLock' in navigator) || wakeLock) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch (e) { /* sin permiso o no soportado: no pasa nada */ }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && source !== 'none') keepAwake();
+  });
   function poke() {
     if (uiHidden || wallpaperMode || !start.classList.contains('hidden')) return;
     bar.classList.remove('hidden'); document.body.classList.remove('idle');

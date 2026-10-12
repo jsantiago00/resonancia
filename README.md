@@ -9,6 +9,12 @@ Visualizador de música que reacciona al sonido como materia real: una esfera de
 - **⚫ Esfera**: ferrofluido flotando que forma picos con la música y vuelve a ser esfera en silencio.
 - **💧 Gota**: ferrofluido visto desde arriba; vibra, suelta gotitas y se vuelve loco con un drop de dubstep.
 - **⏹ Arena**: figuras de Chladni que cambian con el tono; en silencio la arena se dispersa.
+- **⭕ Anillo**: espectro circular; curva suave en chill, gira al ritmo en bailable, tiembla en agresivo.
+- **🌀 Túnel**: viaje por un túnel de luces; la velocidad sigue la energía de la música.
+- **✨ Partículas**: miles de partículas con estela; seda lenta, anillo que late o explosiones según el ánimo.
+- **🧑‍💻 Mini Santi**: un personajito trabajando que se estresa con el ruido (ideal con el micrófono en la tablet). Con música tranqui se pone los auriculares y mueve la cabeza. El control de sensibilidad ajusta su tolerancia. Se personaliza con el objeto `SANTI` en `index.html`.
+
+En celular y tablet la pantalla se mantiene encendida mientras la app está andando, y se puede instalar en la pantalla de inicio ("Agregar a pantalla de inicio").
 
 ## Ánimo de la música
 
