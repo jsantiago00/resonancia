@@ -26,6 +26,8 @@ La app detecta si lo que suena es **🔥 agresivo**, **🌙 chill** o **💃 bai
 ## Fuentes de audio
 
 - 🔊 Audio del PC / pestaña (Chrome/Edge en computadora: al compartir, activar "Compartir audio").
+  - **YouTube Music / Spotify web:** tocar 🔊, elegir la pestaña donde suena la música y activar «Compartir audio de la pestaña».
+  - En celular/tablet el navegador no puede escuchar otras apps: usar 🎤 (escucha lo que sale por el parlante).
 - 🎤 Micrófono (también en celular y tablet).
 - 🎵 Un archivo de audio.
 - ✨ Demo sin audio.

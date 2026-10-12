@@ -85,6 +85,7 @@
       <label class="file">🎵 Abrir canción…<input type="file" accept="audio/*" class="filein"></label>
       <button data-src="demo">✨ Demo sin audio</button>
     </div>
+    <div class="hint" id="ytHint">¿Escuchás en YouTube Music? Tocá 🔊, elegí su pestaña y activá «Compartir audio».</div>
     <div class="hint">M = cambiar modo · F = pantalla completa · H = ocultar controles</div>
   </div>
 </div>
@@ -110,6 +111,10 @@
     <option value="aurora">Aurora</option>
     <option value="gold">Oro</option>
     <option value="mono">Monocromo</option>
+  </select>
+  <select id="outfit" title="Ropa de Mini Santi" style="display:none">
+    <option value="remera">👕 Remera negra</option>
+    <option value="buzo">🧥 Buzo verde</option>
   </select>
   <span class="sl">Sensib. <input type="range" id="sens" min="0.3" max="2.5" step="0.05" value="1"></span>
   <select id="quality" title="Calidad">
@@ -665,7 +670,7 @@ void main() {
     gold:   [[1.0, 0.72, 0.3], [1.0, 0.9, 0.7], '#e8b04a'],
     mono:   [[0.9, 0.9, 0.95], [0.6, 0.6, 0.7], '#c8c8d0'],
   };
-  const settings = { mode: 'sphere', theme: 'mood', sens: 1, quality: 0.75, rotate: true, ai: true };
+  const settings = { mode: 'sphere', theme: 'mood', sens: 1, quality: 0.75, rotate: true, ai: true, outfit: 'remera' };
   try { Object.assign(settings, JSON.parse(localStorage.getItem('ferro-settings') || '{}')); } catch {}
   if (!settings.v2) { settings.theme = 'mood'; settings.v2 = true; } // estrena los colores según el ánimo
   // Colores por ánimo: agresivo = fuego, chill = azul/violeta, bailable = colores reggae
@@ -800,13 +805,20 @@ void main() {
 
   async function startSystem() {
     try {
-      const s = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, systemAudio: 'include' });
+      // Muestra primero las pestañas (ideal para YouTube Music / Spotify web) y pide video a 1 cuadro/s,
+      // porque sólo nos interesa el audio.
+      const s = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: 'browser', frameRate: 1 },
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
+        preferCurrentTab: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include', systemAudio: 'include',
+      });
       if (!s.getAudioTracks().length) {
         s.getTracks().forEach(t => t.stop());
-        showErr('No llegó audio. Al compartir, elige "Pantalla completa" o una pestaña y activa "Compartir audio".');
+        showErr('No llegó audio. Elegí la pestaña de YouTube Music (o "Pantalla completa") y activá "Compartir audio".');
         return;
       }
-      useStream(s, '🔊 audio del sistema');
+      const surface = (s.getVideoTracks()[0] && s.getVideoTracks()[0].getSettings().displaySurface) || '';
+      useStream(s, surface === 'browser' ? '🔊 audio de la pestaña' : '🔊 audio del sistema');
     } catch (e) { if (e.name !== 'NotAllowedError') showErr('No se pudo capturar el audio: ' + e.message); }
   }
 
@@ -1539,7 +1551,8 @@ void main() {
 
   // ---------- Modo Mini Santi: se estresa con el ruido ----------
   // Para personalizarlo, cambiá estos colores (o activá anteojos / barba).
-  const SANTI = { piel: '#f1c6a1', pelo: '#2b1b12', remera: '#3567b0', anteojos: false, barba: false };
+  // Santi: anteojos rectangulares, pelo negro corto, jean y remera negra (o buzo verde con capucha).
+  const SANTI = { piel: '#f1c6a1', pelo: '#121212', remera: '#1c1c21', buzo: '#3e6b3c', jean: '#3d5f8f', zapas: '#e6e6e6', anteojos: true, barba: false };
   const c2 = document.createElement('canvas');
   c2.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:none;z-index:1;pointer-events:none';
   canvas.after(c2);
@@ -1600,15 +1613,20 @@ void main() {
     const w = Math.floor(innerWidth * dpr), h = Math.floor(innerHeight * dpr);
     if (c2.width !== w || c2.height !== h) { c2.width = w; c2.height = h; }
     const st = santi.stress, gr = santi.groove || 0;
-    const desk = h * 0.78;
-    const S = Math.min(w / 700, desk / 540);
+    // escala para que entre todo (medidor, pelo, mesa y zapatillas) en PC, tablet o celu vertical
+    const S = Math.min(w / 700, h / 690);
+    const desk = Math.min(h - 190 * S, h * 0.72);
     const cx = w / 2;
     g2.setTransform(1, 0, 0, 1, 0, 0);
     // pared: azul noche tranquila -> rojo estrés
     const bgG = g2.createLinearGradient(0, 0, 0, h);
-    bgG.addColorStop(0, lerpCol('1b2232', '3b1212', st));
-    bgG.addColorStop(1, lerpCol('0e121b', '1c0707', st));
+    bgG.addColorStop(0, lerpCol('2c3753', '4a1818', st));
+    bgG.addColorStop(1, lerpCol('19203a', '260a0a', st));
     g2.fillStyle = bgG; g2.fillRect(0, 0, w, h);
+    // piso
+    const floorY = desk + 165 * S;
+    g2.fillStyle = lerpCol('2a2422', '2a1614', st); g2.fillRect(0, floorY, w, h - floorY);
+    g2.fillStyle = 'rgba(0,0,0,0.25)'; g2.fillRect(0, floorY, w, 6 * S);
     // reloj de pared con la hora real
     const now = new Date(), clx = cx - 220 * S, cly = h * 0.2;
     g2.fillStyle = '#e8e4da'; g2.beginPath(); g2.arc(clx, cly, 34 * S, 0, 7); g2.fill();
@@ -1627,16 +1645,37 @@ void main() {
     const ox = (Math.random() - 0.5) * shake * 8 * S, oy = (Math.random() - 0.5) * shake * 5 * S;
     const bob = gr * Math.sin(vis.phase * 2) * 9 * S;
     const hx = cx + ox, hy = desk - 235 * S + oy + bob;
-    // torso
-    g2.fillStyle = SANTI.remera; rr(cx - 95 * S + ox, desk - 165 * S + oy, 190 * S, 200 * S, 60 * S); g2.fill();
+    const buzo = settings.outfit === 'buzo';
+    const top = buzo ? SANTI.buzo : SANTI.remera;
+    // piernas con jean debajo de la mesa: pie al ritmo cuando disfruta, pierna nerviosa cuando se estresa
+    for (const sd of [-1, 1]) {
+      const nerv = st > 0.4 && sd > 0 ? Math.sin(t * 26) * (st - 0.4) * 9 * S : 0;
+      const tap = sd > 0 ? Math.max(0, Math.sin(vis.phase * 2)) * gr * 10 * S : 0;
+      const lx = cx + sd * 42 * S, ly = desk + 14 * S;
+      g2.fillStyle = SANTI.jean; rr(lx - 24 * S, ly + nerv, 48 * S, floorY - ly - 14 * S, 12 * S); g2.fill();
+      g2.fillStyle = 'rgba(255,255,255,0.08)'; g2.fillRect(lx - 2 * S, ly + 20 * S + nerv, 3 * S, floorY - ly - 44 * S);
+      g2.fillStyle = SANTI.zapas;
+      g2.beginPath(); g2.ellipse(lx + sd * 10 * S, floorY - 8 * S - tap + nerv * 0.5, 34 * S, 14 * S, sd * -tap / (60 * S), 0, 7); g2.fill();
+      g2.fillStyle = '#9a9a9a'; g2.fillRect(lx + sd * 10 * S - 30 * S, floorY - 4 * S - tap + nerv * 0.5, 60 * S, 4 * S);
+    }
+    // torso (con un borde suave para que la remera negra no se pierda en la pared)
+    g2.fillStyle = top; rr(cx - 95 * S + ox, desk - 165 * S + oy, 190 * S, 200 * S, 60 * S); g2.fill();
+    g2.strokeStyle = 'rgba(255,255,255,0.12)'; g2.lineWidth = 2.5 * S; g2.stroke();
+    // capucha caída detrás del cuello
+    if (buzo) { g2.fillStyle = lerpCol(SANTI.buzo.slice(1), '000000', 0.25); g2.beginPath(); g2.ellipse(hx, hy + 70 * S, 72 * S, 28 * S, 0, 0, 7); g2.fill(); }
     // cuello
     g2.fillStyle = SANTI.piel; rr(hx - 18 * S, hy + 55 * S, 36 * S, 40 * S, 10 * S); g2.fill();
+    // cordones del buzo
+    if (buzo) {
+      g2.strokeStyle = '#e8e8e8'; g2.lineWidth = 3 * S;
+      for (const sd of [-1, 1]) { g2.beginPath(); g2.moveTo(hx + sd * 14 * S, hy + 92 * S); g2.lineTo(hx + sd * 16 * S + Math.sin(t * 2 + sd) * 2 * S, hy + 135 * S); g2.stroke(); }
+    }
     // brazos tecleando (detrás de la notebook)
     const handsUp = st > 0.9;
     if (!handsUp) {
       for (const sd of [-1, 1]) {
         const tap = Math.max(0, Math.sin(santi.typeT * 3.1 + (sd > 0 ? 1.6 : 0))) * (4 + st * 8) * S;
-        g2.strokeStyle = SANTI.remera; g2.lineWidth = 34 * S; g2.lineCap = 'round';
+        g2.strokeStyle = top; g2.lineWidth = 34 * S; g2.lineCap = 'round';
         g2.beginPath(); g2.moveTo(cx + sd * 80 * S + ox, desk - 130 * S + oy);
         g2.quadraticCurveTo(cx + sd * 120 * S + ox, desk - 40 * S, cx + sd * 55 * S + ox, desk - 20 * S - tap); g2.stroke();
       }
@@ -1648,8 +1687,8 @@ void main() {
     g2.beginPath(); g2.ellipse(hx - 70 * S, hy + 5 * S, 12 * S, 18 * S, 0, 0, 7); g2.ellipse(hx + 70 * S, hy + 5 * S, 12 * S, 18 * S, 0, 0, 7); g2.fill();
     // pelo (se para con el estrés)
     g2.fillStyle = SANTI.pelo;
-    g2.beginPath(); g2.ellipse(hx, hy - 45 * S, 72 * S, 40 * S, 0, Math.PI, 0); g2.fill();
-    const spikes = 9, sh = (8 + st * st * 40) * S;
+    g2.beginPath(); g2.ellipse(hx, hy - 42 * S, 72 * S, 36 * S, 0, Math.PI, 0); g2.fill();   // pelo corto
+    const spikes = 11, sh = (3 + st * st * 42) * S;
     g2.beginPath();
     for (let k = 0; k <= spikes; k++) {
       const a = Math.PI + (k / spikes) * Math.PI, rx = 70 * S, ry = 42 * S;
@@ -1694,10 +1733,16 @@ void main() {
         if (st > 0.25 && st <= 0.55) { g2.fillStyle = skin; g2.fillRect(ex - 14 * S, ey - 15 * S, 28 * S, 11 * S); }   // párpado cansado
       }
     }
-    if (SANTI.anteojos) {
-      g2.strokeStyle = '#222'; g2.lineWidth = 3.5 * S;
-      g2.beginPath(); g2.arc(hx - 27 * S, hy - 4 * S, 19 * S, 0, 7); g2.moveTo(hx + 46 * S, hy - 4 * S); g2.arc(hx + 27 * S, hy - 4 * S, 19 * S, 0, 7);
-      g2.moveTo(hx - 8 * S, hy - 6 * S); g2.lineTo(hx + 8 * S, hy - 6 * S); g2.stroke();
+    if (SANTI.anteojos) {                              // anteojos rectangulares
+      g2.strokeStyle = '#101010'; g2.lineWidth = 4 * S;
+      for (const sd of [-1, 1]) { rr(hx + sd * 27 * S - 21 * S, hy - 18 * S, 42 * S, 28 * S, 5 * S); g2.stroke(); }
+      g2.beginPath();
+      g2.moveTo(hx - 6 * S, hy - 8 * S); g2.lineTo(hx + 6 * S, hy - 8 * S);
+      g2.moveTo(hx - 48 * S, hy - 10 * S); g2.lineTo(hx - 68 * S, hy - 6 * S);
+      g2.moveTo(hx + 48 * S, hy - 10 * S); g2.lineTo(hx + 68 * S, hy - 6 * S);
+      g2.stroke();
+      g2.strokeStyle = 'rgba(255,255,255,0.35)'; g2.lineWidth = 2 * S;
+      for (const sd of [-1, 1]) { g2.beginPath(); g2.moveTo(hx + sd * 27 * S - 12 * S, hy - 6 * S); g2.lineTo(hx + sd * 27 * S - 4 * S, hy - 14 * S); g2.stroke(); }
     }
     // boca
     g2.strokeStyle = '#5a2a22'; g2.lineWidth = 5 * S;
@@ -1717,9 +1762,19 @@ void main() {
       rr(hx - 92 * S, hy - 22 * S, 24 * S, 46 * S, 10 * S); g2.fill();
       rr(hx + 68 * S, hy - 22 * S, 24 * S, 46 * S, 10 * S); g2.fill();
     }
+    // con el buzo, al borde del colapso se pone la capucha
+    if (buzo && st > 0.85) {
+      g2.fillStyle = SANTI.buzo;
+      g2.beginPath();
+      g2.ellipse(hx, hy - 6 * S, 90 * S, 98 * S, 0, 0, 7);
+      g2.ellipse(hx, hy + 10 * S, 62 * S, 70 * S, 0, 0, 7);
+      g2.fill('evenodd');
+      g2.strokeStyle = 'rgba(0,0,0,0.25)'; g2.lineWidth = 3 * S;
+      g2.beginPath(); g2.ellipse(hx, hy + 10 * S, 62 * S, 70 * S, 0, 0, 7); g2.stroke();
+    }
     // manos en la cabeza al máximo
     if (handsUp) {
-      g2.strokeStyle = SANTI.remera; g2.lineWidth = 34 * S;
+      g2.strokeStyle = top; g2.lineWidth = 34 * S;
       for (const sd of [-1, 1]) {
         g2.beginPath(); g2.moveTo(cx + sd * 80 * S + ox, desk - 130 * S + oy); g2.quadraticCurveTo(cx + sd * 150 * S, hy, hx + sd * 60 * S, hy - 50 * S); g2.stroke();
         g2.fillStyle = skin; g2.beginPath(); g2.arc(hx + sd * 60 * S, hy - 50 * S, 18 * S, 0, 7); g2.fill();
@@ -1738,9 +1793,13 @@ void main() {
     }
     g2.globalAlpha = 1;
 
-    // escritorio
-    g2.fillStyle = '#5b3b26'; g2.fillRect(0, desk, w, h - desk);
-    g2.fillStyle = '#7a5235'; g2.fillRect(0, desk, w, 10 * S);
+    // mesa con patas (se ven las piernas por debajo)
+    const tl = cx - 280 * S, tw2 = 560 * S;
+    g2.fillStyle = '#4a2f1e';
+    g2.fillRect(tl + 14 * S, desk + 18 * S, 16 * S, floorY - desk - 18 * S);
+    g2.fillRect(tl + tw2 - 30 * S, desk + 18 * S, 16 * S, floorY - desk - 18 * S);
+    g2.fillStyle = '#5b3b26'; g2.fillRect(tl, desk, tw2, 22 * S);
+    g2.fillStyle = '#7a5235'; g2.fillRect(tl, desk, tw2, 7 * S);
     // notebook (vista de atrás) con logo que brilla con la música
     g2.fillStyle = '#2a2d34'; rr(cx - 120 * S, desk - 150 * S, 240 * S, 150 * S, 10 * S); g2.fill();
     g2.fillStyle = '#3a3e47'; g2.fillRect(cx - 140 * S, desk - 6 * S, 280 * S, 12 * S);
@@ -1983,6 +2042,7 @@ void main() {
   function setMode(m) {
     settings.mode = m; save();
     $('#mode').value = m;
+    $('#outfit').style.display = m === 'santi' ? '' : 'none';
     document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
   }
   setMode(settings.mode);
@@ -1995,6 +2055,7 @@ void main() {
   // En celulares y tablets no se puede capturar el audio del sistema: el micrófono pasa a ser la opción principal
   if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
     document.querySelectorAll('[data-src="system"]').forEach(b => b.remove());
+    $('#ytHint').textContent = '¿Música en YouTube Music o Spotify? Usá 🎤: escucha lo que suena por el parlante.';
     const mic = $('#start [data-src="mic"]');
     if (mic) mic.classList.add('primary');
   }
@@ -2003,6 +2064,9 @@ void main() {
   const applyTheme = () => document.documentElement.style.setProperty('--accent', settings.theme === 'mood' ? moodTheme[2] : (THEMES[settings.theme] || THEMES.neon)[2]);
   $('#theme').value = settings.theme; applyTheme();
   $('#theme').addEventListener('change', e => { settings.theme = e.target.value; applyTheme(); save(); });
+  if (params.get('outfit') === 'buzo' || params.get('outfit') === 'remera') settings.outfit = params.get('outfit');
+  $('#outfit').value = settings.outfit;
+  $('#outfit').addEventListener('change', e => { settings.outfit = e.target.value; save(); });
   $('#sens').value = settings.sens;
   $('#sens').addEventListener('input', e => { settings.sens = +e.target.value; save(); });
   $('#quality').value = String(settings.quality);
