@@ -2875,8 +2875,8 @@ void main() {
     rg.fillStyle = tg; rg.fillRect(0, 0, RW, 640);
 
     // Bandas: se apilan desde abajo (por encima de la zona que tapa Instagram); cada una ocupa lugar según su presencia
-    const X = 40, W = RW - 2 * X, GAP = 14, BOTTOM = 1500;
-    const AVAIL = split ? 530 : 980;                               // alto disponible para las bandas
+    const X = 40, W = RW - 2 * X, GAP = 14, BOTTOM = split ? 1690 : 1500;   // en mitades bajan más, para aprovechar el espacio
+    const AVAIL = split ? BOTTOM - 970 : 980;                              // alto disponible para las bandas
     const H = Math.max(split ? 34 : 48, Math.min(120, (AVAIL - GAP * (n - 1)) / n));
     // Efectos de zoom: la pista destacada se hace más alta y las demás le hacen lugar
     const fx = settings.stemsFx || 'enter', jn = Math.max(0, Math.floor(t * BAR_RATE));
