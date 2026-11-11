@@ -59,6 +59,33 @@
   .sl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
   input[type=range] { accent-color: var(--accent); width: 90px; }
   #status { font-size: 12px; color: var(--muted); padding: 0 4px; }
+  /* Modo reel 9:16: se ve exactamente lo que se graba */
+  #rec { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    height: min(calc(100vh - 32px), calc((100vw - 32px) * 16 / 9)); aspect-ratio: 9 / 16; width: auto;
+    border-radius: 6px; box-shadow: 0 0 0 1px var(--line); z-index: 1; }
+  body.reel #rec { display: block; }
+  body.reel #c, body.reel .santi-layer { opacity: 0; pointer-events: none; }
+  #reel { position: fixed; top: 16px; left: 16px; z-index: 5; width: min(300px, calc(100% - 32px)); display: none;
+    background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--line); border-radius: 16px; padding: 16px; font-size: 13px; }
+  body.reel #reel { display: grid; gap: 10px; }
+  body.recording #reel, body.recording #bar { display: none; }
+  #reel h2 { margin: 0; font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+  #reel h2 button { padding: 2px 9px; font-size: 15px; }
+  #reel label.row { display: grid; gap: 4px; color: var(--muted); }
+  #reel input[type=text], #reel select { font: inherit; color: var(--text); background: rgba(255,255,255,.06);
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  #reel select option { background: #15151b; }
+  #reel label.file { padding: 8px 10px; font-size: 13px; border-radius: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #reel .note { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 0; }
+  #recPill { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 5; display: none;
+    align-items: center; gap: 10px; background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 6px 6px 14px; font-size: 13px; }
+  body.recording #recPill { display: flex; }
+  #recPill .dot { width: 9px; height: 9px; border-radius: 50%; background: #ff3b4a; animation: blink 1.2s infinite; }
+  #recPill button { padding: 5px 12px; font-size: 13px; border-radius: 999px; }
+  @keyframes blink { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { #recPill .dot { animation: none; } }
   #err { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 4; background: rgba(120,20,40,.85);
     padding: 10px 16px; border-radius: 10px; font-size: 13px; display: none; max-width: calc(100% - 32px); }
 </style>
@@ -125,10 +152,28 @@
   </select>
   <button id="ai" title="IA de ánimo (Essentia): descarga ~13 MB la primera vez">🧠</button>
   <button id="rot" title="Girar">⟳</button>
+  <button id="reelBtn" title="Reel para Instagram (video 9:16)">🎬</button>
   <button id="fs" title="Pantalla completa">⛶</button>
   <span id="status">sin audio</span>
   <span id="moodTag" title="Ánimo detectado en la música" style="font-size:12px;color:var(--muted)"></span>
 </div>
+<canvas id="rec" width="1080" height="1920"></canvas>
+<div id="reel">
+  <h2>Reel 9:16 <button id="reelClose" title="Salir del modo reel">✕</button></h2>
+  <label class="file" id="reelFileLbl">🎵 Elegir la canción…<input type="file" accept="audio/*" id="reelFile"></label>
+  <label class="row">Título<input type="text" id="reelTitle" placeholder="Nombre del tema" maxlength="60"></label>
+  <label class="row">Artista<input type="text" id="reelArtist" placeholder="Tu nombre" maxlength="60"></label>
+  <label class="row">Texto en el video
+    <select id="reelText">
+      <option value="intro">Al principio (6 s)</option>
+      <option value="always">Todo el video</option>
+      <option value="none">Sin texto</option>
+    </select>
+  </label>
+  <button class="primary" id="reelGo" disabled>⏺ Grabar reel</button>
+  <p class="note">Graba la canción entera de principio a fin y descarga el video. No cambies de pestaña mientras graba: el navegador frena la animación.</p>
+</div>
+<div id="recPill"><span class="dot"></span><span id="recTime">0:00</span><button id="recStop">⏹ Detener</button></div>
 <div id="err"></div>
 
 <!-- Esfera de ferrofluido (raymarching) -->
@@ -229,7 +274,7 @@ vec3 env(vec3 d) {
 }
 
 void main() {
-  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / min(uRes.x, uRes.y);
   vec3 ro = vec3(0.0, 0.0, 5.0);
   vec3 rd = normalize(vec3(uv, -1.8));
 
@@ -509,7 +554,7 @@ float band(float x) {
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
 void main() {
-  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y + uShake;
+  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / min(uRes.x, uRes.y) + uShake;
   float r = length(uv);
   float ang = atan(uv.x, uv.y) + uRot;
   ang = mod(ang + 3.14159, 6.28318) - 3.14159;
@@ -758,6 +803,9 @@ void main() {
   const texData = new Uint8Array(NB);
 
   let dpr = 1;
+  // Modo reel: la escena se dibuja como si fuera una pantalla vertical de 540×960 a densidad 2 (= 1080×1920)
+  const reel = { on: false, file: null, rec: null, recording: false, t0: 0, ending: 0, audio: null, dest: null, hiddenWhileRec: false };
+  const viewW = () => reel.on ? 540 : innerWidth, viewH = () => reel.on ? 960 : innerHeight;
   // Calidad automática: baja o sube la resolución para mantener la fluidez (~60 fps)
   let autoScale = isMobile ? 0.55 : 0.75, perfAcc = 0, perfFrames = 0, perfGood = 0;
   const renderScale = () => settings.quality === 'auto' ? autoScale : settings.quality;
@@ -771,9 +819,9 @@ void main() {
     else if (avg < 17.6 && ++perfGood >= 3) { autoScale = Math.min(isMobile ? 0.8 : 1, autoScale * 1.08); perfGood = 0; }
   }
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2);
-    const w = Math.max(1, Math.floor(innerWidth * dpr * renderScale()));
-    const h = Math.max(1, Math.floor(innerHeight * dpr * renderScale()));
+    dpr = reel.on ? 2 : Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2);
+    const w = Math.max(1, Math.floor(viewW() * dpr * renderScale()));
+    const h = Math.max(1, Math.floor(viewH() * dpr * renderScale()));
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     gl.viewport(0, 0, w, h);
   }
@@ -1571,6 +1619,7 @@ void main() {
   const SANTI = { piel: '#f1c6a1', pelo: '#121212', remera: '#1c1c21', buzo: '#3e6b3c', jean: '#3d5f8f', zapas: '#e6e6e6', anteojos: true, barba: false };
   const c2 = document.createElement('canvas');
   c2.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:none;z-index:1;pointer-events:none';
+  c2.className = 'santi-layer';
   canvas.after(c2);
   const g2 = c2.getContext('2d');
   const santi = { stress: 0, blinkT: 2, blink: 0, phraseT: 0, phrase: '', bucket: -1, notes: [], puffs: [], drops: [], typeT: 0 };
@@ -1626,7 +1675,7 @@ void main() {
   }
 
   function drawSanti(t, th) {
-    const w = Math.floor(innerWidth * dpr), h = Math.floor(innerHeight * dpr);
+    const w = Math.floor(viewW() * dpr), h = Math.floor(viewH() * dpr);
     if (c2.width !== w || c2.height !== h) { c2.width = w; c2.height = h; }
     const st = santi.stress, gr = santi.groove || 0;
     // escala para que entre todo (medidor, pelo, mesa y zapatillas) en PC, tablet o celu vertical
@@ -1974,6 +2023,7 @@ void main() {
       gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
       gl.drawArrays(gl.POINTS, 0, NP);
     }
+    if (reel.on) composeReel(t);
     if (debug) { const e = $('#err'); e.style.display = 'block'; e.textContent = `t=${t.toFixed(1)} lvl=${level.toFixed(3)} bass=${bass.toFixed(3)} mid=${mid.toFixed(3)} drive=${drive.toFixed(3)} locura=${hype.toFixed(2)} | A=${mood.agresivo.toFixed(2)} C=${mood.chill.toFixed(2)} B=${mood.bailable.toFixed(2)}`; }
     requestAnimationFrame(frame);
   }
@@ -2104,9 +2154,151 @@ void main() {
   paintRot();
   rotBtn.addEventListener('click', () => { settings.rotate = !settings.rotate; paintRot(); save(); });
 
+  // ---------- Modo reel: video 9:16 para Instagram ----------
+  const recC = $('#rec'), rg = recC.getContext('2d');
+  const RW = 1080, RH = 1920;
+  const smooth = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+  const fmt = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  let lastShownSec = -1;
+
+  function fitFont(text, weight, size, min, maxW) {
+    for (; size > min; size -= 2) {
+      rg.font = `${weight} ${size}px "Segoe UI", system-ui, -apple-system, sans-serif`;
+      if (rg.measureText(text).width <= maxW) break;
+    }
+    return size;
+  }
+
+  function composeReel() {
+    const now = performance.now();
+    rg.globalAlpha = 1;
+    rg.fillStyle = '#000'; rg.fillRect(0, 0, RW, RH);
+    rg.imageSmoothingEnabled = true; rg.imageSmoothingQuality = 'high';
+    rg.drawImage(settings.mode === 'santi' ? c2 : canvas, 0, 0, RW, RH);
+
+    // Texto: arriba a la izquierda, fuera de la zona que tapan los botones y la descripción de Instagram
+    const title = $('#reelTitle').value.trim(), artist = $('#reelArtist').value.trim(), how = $('#reelText').value;
+    const el = reel.recording ? (now - reel.t0) / 1000 : 2;
+    let a = how === 'none' ? 0 : how === 'always' ? smooth((el - 0.6) / 0.8) : smooth((el - 0.6) / 0.8) * (1 - smooth((el - 5.2) / 1));
+    if (!reel.recording && how !== 'none') a = 1;                    // en la vista previa se ve siempre, para ubicarlo
+    if (a > 0.01 && (title || artist)) {
+      const x = 84, maxW = RW - 2 * x, lift = 14 * (1 - a);
+      rg.save();
+      rg.globalAlpha = a;
+      rg.shadowColor = 'rgba(0,0,0,.6)'; rg.shadowBlur = 28;
+      rg.textBaseline = 'alphabetic';
+      let y = 250 + lift;
+      if (title) {
+        fitFont(title, 700, 72, 40, maxW);
+        rg.fillStyle = '#fff'; rg.fillText(title, x, y);
+        y += 62;
+      }
+      if (artist) {
+        fitFont(artist, 400, 40, 28, maxW);
+        rg.fillStyle = 'rgba(255,255,255,.75)'; rg.fillText(artist, x, y);
+      }
+      rg.restore();
+    }
+
+    // Fundido desde negro al empezar y a negro al terminar
+    if (reel.recording) {
+      let v = smooth((now - reel.t0) / 900);
+      if (reel.ending) v *= 1 - smooth((now - reel.ending) / 1400);
+      if (v < 1) { rg.globalAlpha = 1 - v; rg.fillStyle = '#000'; rg.fillRect(0, 0, RW, RH); rg.globalAlpha = 1; }
+      const sec = Math.floor(reel.audio ? reel.audio.currentTime : 0);
+      if (sec !== lastShownSec) {
+        lastShownSec = sec;
+        const total = reel.audio && isFinite(reel.audio.duration) ? ' / ' + fmt(reel.audio.duration) : '';
+        $('#recTime').textContent = fmt(sec) + total;
+      }
+    }
+  }
+
+  function setReel(on) {
+    if (reel.recording) return;
+    reel.on = on;
+    document.body.classList.toggle('reel', on);
+    if (on && source === 'none') startDemo();
+  }
+
+  async function startReel() {
+    if (!reel.file || reel.recording) return;
+    if (!window.MediaRecorder || !recC.captureStream) { showErr('Este navegador no puede grabar video. Probá con Chrome o Edge en la compu.'); return; }
+    stopCurrent(); ensureCtx();
+    const audio = new Audio(URL.createObjectURL(reel.file));
+    const node = actx.createMediaElementSource(audio);
+    node.connect(analyser); analyser.connect(actx.destination);
+    const dest = actx.createMediaStreamDestination();
+    node.connect(dest);
+    current = { stop() { audio.pause(); node.disconnect(); try { analyser.disconnect(actx.destination); } catch {} URL.revokeObjectURL(audio.src); } };
+    source = 'analyser'; started(true); tapEssentia();
+    await new Promise(r => audio.readyState >= 1 ? r() : audio.addEventListener('loadedmetadata', r, { once: true }));
+
+    const stream = new MediaStream([...recC.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+    const types = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
+    const mime = types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+    const rec = new MediaRecorder(stream, Object.assign({ videoBitsPerSecond: 12e6, audioBitsPerSecond: 256000 }, mime ? { mimeType: mime } : {}));
+    const chunks = [];
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      const type = rec.mimeType || mime || 'video/webm';
+      const ext = type.includes('mp4') ? 'mp4' : 'webm';
+      const base = ($('#reelTitle').value.trim() || reel.file.name.replace(/\.[^.]+$/, '')).replace(/[\\/:*?"<>|]+/g, '').slice(0, 60) || 'reel';
+      const url = URL.createObjectURL(new Blob(chunks, { type }));
+      const link = document.createElement('a');
+      link.href = url; link.download = `${base} (reel).${ext}`;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      stream.getTracks().forEach(t => t.stop());
+      dest.disconnect();
+      stopCurrent(); source = 'none';
+      reel.recording = false; reel.rec = null; reel.audio = null;
+      document.body.classList.remove('recording');
+      setStatus('✅ video descargado');
+      if (reel.hiddenWhileRec) showErr('Cambiaste de pestaña mientras grababa: puede haber partes trabadas. Conviene grabarlo de nuevo sin salir de la pestaña.');
+      else if (ext === 'webm') showErr('Se guardó en .webm porque este navegador no graba .mp4. Clipchamp lo abre y lo exporta en .mp4 para Instagram.');
+    };
+
+    Object.assign(reel, { rec, audio, recording: true, t0: performance.now(), ending: 0, hiddenWhileRec: false });
+    lastShownSec = -1;
+    document.body.classList.add('recording');
+    setStatus('🎬 grabando');
+    rec.start(1000);
+    audio.addEventListener('ended', endReel, { once: true });
+    setTimeout(() => { if (reel.recording && !reel.ending) audio.play().catch(e => { showErr(e.message); endReel(); }); }, 350);
+  }
+
+  function endReel() {
+    if (!reel.recording || reel.ending) return;
+    reel.ending = performance.now();
+    if (reel.audio && !reel.audio.ended) reel.audio.pause();
+    const rec = reel.rec;
+    setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 1600);   // deja la cola en silencio con el fundido
+  }
+
+  document.addEventListener('visibilitychange', () => { if (reel.recording && document.hidden) reel.hiddenWhileRec = true; });
+  $('#reelBtn').addEventListener('click', () => setReel(true));
+  $('#reelClose').addEventListener('click', () => setReel(false));
+  $('#reelGo').addEventListener('click', startReel);
+  $('#recStop').addEventListener('click', endReel);
+  $('#reelFile').addEventListener('change', e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    reel.file = f;
+    const name = f.name.replace(/\.[^.]+$/, '');
+    $('#reelFileLbl').firstChild.textContent = '🎵 ' + name;
+    if (!$('#reelTitle').value.trim()) $('#reelTitle').value = name;
+    $('#reelGo').disabled = false;
+  });
+  $('#reelArtist').value = settings.reelArtist || '';
+  $('#reelArtist').addEventListener('input', e => { settings.reelArtist = e.target.value; save(); });
+  $('#reelText').value = settings.reelText || 'intro';
+  $('#reelText').addEventListener('change', e => { settings.reelText = e.target.value; save(); });
+
   const toggleFs = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
   $('#fs').addEventListener('click', toggleFs);
   addEventListener('keydown', e => {
+    if (e.target.closest && e.target.closest('input, select, textarea')) return;   // escribiendo el título, etc.
     const k = e.key.toLowerCase();
     if (k === 'f') toggleFs();
     if (k === 'm') setMode(MODE_LIST[(MODE_LIST.indexOf(settings.mode) + 1) % MODE_LIST.length]);
