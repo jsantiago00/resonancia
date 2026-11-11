@@ -37,7 +37,11 @@ La app detecta si lo que suena es **🔥 agresivo**, **🌙 chill** o **💃 bai
 Graban el tema entero a 1080×1920 y descargan el video (Chrome o Edge en computadora).
 
 - **🎬 Reel**: cualquiera de los modos con una canción, con título y artista opcionales.
-- **📷 Pistas**: una foto de fondo y la forma de onda de cada pista del tema (exportadas desde Ableton con «All Individual Tracks»). Cada pista aparece cuando empieza a sonar y se va cuando se calla. Admite textos con tiempo, uno por línea: `0:22 bueno, antes de que te aburras`. Se puede abrir directo con `?pistas`.
+- **📷 Pistas**: una foto de fondo y la forma de onda de cada pista del tema (exportadas desde Ableton con «All Individual Tracks»). Cada pista aparece cuando empieza a sonar y se va cuando se calla. Se puede abrir directo con `?pistas`.
+  - **Fondo:** una foto, un video (sin sonido, en bucle) o cualquiera de los visuales de la app (gota, túnel, etc.), que reacciona al audio.
+  - **Master opcional:** si se carga, se escucha el master (la mezcla final) y las pistas sólo se dibujan.
+  - **Pistas:** se pueden renombrar, colorear, quitar (✕) y escuchar solas (🎧) para reconocerlas. Los grupos (voces, guitarras…) comparten color y, con «1 banda», se dibujan como una sola. Nombres, colores y grupos se recuerdan por nombre de archivo. Además: opacidad general y un efecto (zoom a la que entra, zoom a la que más suena o latido).
+  - **Textos:** cada uno con su momento, duración y tamaño; si dos coinciden se apilan. También se puede pegar una lista, una línea por texto: `0:22 bueno, antes de que te aburras`.
 
 ## Como fondo de pantalla en Windows
 

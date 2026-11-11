@@ -70,9 +70,33 @@
     border: 1px solid var(--line); border-radius: 16px; padding: 16px; font-size: 13px; }
   body.reel #reel, body.stems #stems { display: grid; gap: 10px; }
   body.stems #reel, body.recording #reel, body.recording #stems, body.recording #bar { display: none; }
-  .panel { max-height: calc(100% - 32px); overflow-y: auto; }
-  .panel textarea { font: inherit; font-size: 12px; color: var(--text); background: rgba(255,255,255,.06);
-    border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; resize: vertical; min-height: 64px; }
+  .panel { max-height: calc(100% - 32px); overflow: hidden auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.25) transparent; }
+  .panel > *, .txt > * { min-width: 0; }
+  #stems { width: min(380px, calc(100% - 32px)); }
+  #stemsList, #stemsGroups { display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr); }
+  #stemsGroups:empty { display: none; }
+  .trk select { width: 92px; flex: none; padding: 6px 4px; }
+  .trk button { padding: 4px 8px; font-size: 13px; border-radius: 10px; flex: none; }
+  .trk button.on { background: var(--accent); border-color: transparent; }
+  .trk .chk { flex: none; font-size: 12px; gap: 5px; }
+  .panel [hidden] { display: none !important; }
+  .panel h3 { margin: 8px 0 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .panel .pick { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .panel .pick button { padding: 8px 6px; font-size: 13px; }
+  .panel .pick button.on { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.35); }
+  .panel .frow { display: flex; gap: 6px; }
+  .panel .frow label.file { flex: 1; min-width: 0; }
+  .panel .frow button, .txt button { padding: 4px 9px; font-size: 13px; border-radius: 10px; }
+  .panel label.row input[type=range] { width: 100%; }
+  .panel input[type=number] { font: inherit; color: var(--text); background: rgba(255,255,255,.06);
+    border: 1px solid var(--line); border-radius: 10px; padding: 6px 6px; }
+  #stemsTexts { display: grid; gap: 6px; }
+  #stemsTexts:empty { display: none; }
+  .txt { display: grid; gap: 5px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.03); }
+  .txt .top { display: flex; gap: 5px; align-items: center; color: var(--muted); font-size: 12px; }
+  .txt .top input[type=text] { width: 54px; padding: 6px 7px; text-align: center; }
+  .txt .top input[type=number] { width: 50px; }
+  .txt .top select { flex: 1; min-width: 0; padding: 6px 4px; }
   .panel .chk { display: flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; }
   .panel .chk input { accent-color: var(--accent); }
   .panel .play { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
@@ -174,13 +198,44 @@
 <canvas id="rec" width="1080" height="1920"></canvas>
 <div id="stems" class="panel">
   <h2>Pistas 9:16 <button id="stemsClose" title="Salir del modo pistas">✕</button></h2>
+  <h3>Fondo</h3>
+  <div class="pick" id="stemsBg"><button data-bg="photo">📷 Foto</button><button data-bg="video">🎞 Video</button><button data-bg="scene">✨ Visual</button></div>
   <label class="file" id="stemsPhotoLbl">📷 Elegir la foto…<input type="file" accept="image/*" id="stemsPhoto"></label>
+  <label class="file" id="stemsVideoLbl">🎞 Elegir el video…<input type="file" accept="video/*" id="stemsVideo"></label>
+  <label class="chk" id="stemsZoomLbl"><input type="checkbox" id="stemsZoom"> Zoom lento en la foto</label>
+  <select id="stemsMode" title="Visual de fondo">
+    <option value="sphere">⚫ Ferrofluido</option>
+    <option value="drop">💧 Gota</option>
+    <option value="sand">⏹ Arena</option>
+    <option value="ring">⭕ Anillo</option>
+    <option value="tunnel">🌀 Túnel</option>
+    <option value="particles">✨ Partículas</option>
+    <option value="santi">🧑‍💻 Mini Santi</option>
+  </select>
+  <h3>Audio</h3>
   <label class="file" id="stemsFilesLbl">🎚 Elegir las pistas…<input type="file" accept="audio/*" multiple id="stemsFiles"></label>
+  <div class="frow">
+    <label class="file" id="stemsMasterLbl">🎧 Master (opcional)…<input type="file" accept="audio/*" id="stemsMaster"></label>
+    <button id="stemsMasterX" title="Quitar el master" hidden>✕</button>
+  </div>
+  <p class="note">Con master se escucha el master (tu mezcla final) y las pistas sólo se dibujan. Sin master suena la suma de las pistas.</p>
+  <h3>Pistas</h3>
   <div id="stemsList"></div>
-  <label class="row">Textos (uno por línea, con su tiempo)
-    <textarea id="stemsText" rows="4" placeholder="0:22 bueno, antes de que te aburras"></textarea>
+  <div id="stemsGroups"></div>
+  <p class="note">🎧 escucha una pista sola para reconocerla. Las de un mismo grupo comparten color; con «1 banda» se dibujan juntas.</p>
+  <label class="row">Opacidad de las pistas<input type="range" id="stemsAlpha" min="0.15" max="1" step="0.05" value="1"></label>
+  <label class="row">Efecto
+    <select id="stemsFx">
+      <option value="enter">Zoom a la pista que entra</option>
+      <option value="focus">Zoom a la que más suena</option>
+      <option value="pulse">Latido con el volumen</option>
+      <option value="none">Sin efecto</option>
+    </select>
   </label>
-  <label class="chk"><input type="checkbox" id="stemsZoom"> Zoom lento en la foto</label>
+  <h3>Textos</h3>
+  <div id="stemsTexts"></div>
+  <button id="stemsAddText">＋ Texto en 0:00</button>
+  <p class="note">Mové la barra hasta el momento justo y agregá el texto. Si dos se pisan, se apilan.</p>
   <div class="play"><button id="stemsPlay" title="Escuchar / pausar" disabled>▶</button><input type="range" id="stemsSeek" min="0" max="1" step="0.001" value="0"><span id="stemsClock">0:00</span></div>
   <button class="primary" id="stemsGo" disabled>⏺ Grabar video</button>
   <p class="note">Exportá las pistas desde Ableton con «All Individual Tracks» (todas del mismo largo). Graba el tema entero y descarga el video. No cambies de pestaña mientras graba.</p>
@@ -1989,8 +2044,8 @@ void main() {
         + (ESS.ready && ESS.agg !== null ? ' · 🧠' : settings.ai && ESS.worker && !ESS.ready ? ' · 🧠 cargando…' : '');
     }
 
-    if (reel.on && reel.kind === 'stems') {
-      // el modo pistas no usa la escena: dibuja todo en composeStems
+    if (reel.on && reel.kind === 'stems' && settings.stemsBg !== 'scene') {
+      // el modo pistas con foto no usa la escena: dibuja todo en composeStems
     } else if (settings.mode === 'sphere') {
       const M = mood;
       if (settings.rotate && !dragging) yaw += dt * 0.12 * (0.5 * M.chill + M.bailable + 1.8 * M.agresivo);
@@ -2140,7 +2195,7 @@ void main() {
 
   function setMode(m) {
     settings.mode = m; save();
-    $('#mode').value = m;
+    $('#mode').value = $('#stemsMode').value = m;
     $('#outfit').style.display = m === 'santi' ? '' : 'none';
     document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
   }
@@ -2348,8 +2403,8 @@ void main() {
   // se guarda sólo su envolvente: BAR_RATE barras por segundo, de BAR_PX píxeles de ancho.
   const STEM_COLORS = ['#ff7a8a', '#ffb454', '#ffe066', '#7be08a', '#5ad6d6', '#6aa8ff', '#b08cff', '#ff8ad8'];
   const BAR_RATE = 25, BAR_PX = 5;
-  const stems = { tracks: [], mix: null, gain: 1, dur: 0, name: 'pistas', texts: [], photo: null, bg: null, frost: null,
-    node: null, out: null, playing: false, at: 0, t: 0, loading: false, shownSec: -1 };
+  const stems = { tracks: [], groups: [], bands: [], solo: null, soloBuf: null, video: null, tdur: 0, mix: null, master: null, gain: 1, dur: 0, name: 'pistas', texts: [], photo: null, bg: null, frost: null,
+    live: null, glass: null, node: null, out: null, playing: false, at: 0, t: 0, loading: false, shownSec: -1 };
   const seek = $('#stemsSeek');
   const stemsTime = () => stems.playing ? Math.min(stems.dur, Math.max(0, actx.currentTime - stems.at)) : stems.t;
   const hexRgb = h => h.match(/\w\w/g).map(v => parseInt(v, 16));
@@ -2375,10 +2430,49 @@ void main() {
     return v;
   }
 
+  const decodeFile = async f => actx.decodeAudioData(await f.arrayBuffer());
+  // Envolvente lenta (promedio de ~1 s): la usa el efecto "zoom a la que más suena"
+  function slowOf(peaks) {
+    const slow = new Float32Array(peaks.length);
+    for (let j = 0, s = 0; j < peaks.length + 12; j++) {
+      if (j < peaks.length) s += peaks[j];
+      if (j >= 25) s -= peaks[j - 25];
+      if (j >= 12) slow[j - 12] = s / 25;
+    }
+    return slow;
+  }
+  // Suma un buffer a la mezcla `m` (la agranda si hace falta)
+  function sumInto(m, buf) {
+    if (!m.buf || buf.length > m.buf.length) {
+      const nb = actx.createBuffer(2, buf.length, actx.sampleRate);
+      if (m.buf) { nb.getChannelData(0).set(m.L); nb.getChannelData(1).set(m.R); }
+      m.buf = nb; m.L = nb.getChannelData(0); m.R = nb.getChannelData(1);
+    }
+    const a = buf.getChannelData(0), b = buf.numberOfChannels > 1 ? buf.getChannelData(1) : a;
+    for (let k = 0; k < buf.length; k++) { m.L[k] += a[k]; m.R[k] += b[k]; }
+  }
+  // Si la suma de las pistas pasa de 0 dB, se baja lo justo para que no sature
+  function finishMix(m) {
+    if (!m.buf) return;
+    let pk = 0;
+    for (let k = 0; k < m.L.length; k++) { const v = Math.max(Math.abs(m.L[k]), Math.abs(m.R[k])); if (v > pk) pk = v; }
+    Object.assign(stems, { mix: m.buf, gain: pk > 0.98 ? 0.98 / pk : 1 });
+  }
+  // Rehace la mezcla con las pistas que quedan (después de quitar alguna)
+  async function buildMix() {
+    const lbl = $('#stemsFilesLbl').firstChild, was = lbl.textContent, m = {};
+    stems.loading = true; paintStems();
+    lbl.textContent = '⏳ Mezclando las pistas…';
+    try { for (const tr of stems.tracks) sumInto(m, await decodeFile(tr.file)); finishMix(m); }
+    catch (e) { showErr('No se pudieron mezclar las pistas.'); }
+    lbl.textContent = was;
+    stems.loading = false; paintStems();
+  }
+
   async function loadStems(files) {
     if (!files.length || stems.loading || reel.recording) return;
     stopStems(); ensureCtx();
-    Object.assign(stems, { loading: true, tracks: [], mix: null, t: 0 });
+    Object.assign(stems, { loading: true, tracks: [], groups: [], bands: [], mix: null, solo: null, soloBuf: null, t: 0, tdur: 0 });
     paintStems();
     const lbl = $('#stemsFilesLbl').firstChild;
     files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
@@ -2388,57 +2482,201 @@ void main() {
     for (const n of names) while (!n.startsWith(pre)) pre = pre.slice(0, -1);
     pre = pre.replace(/[^\s_-]*$/, '');
     stems.name = pre.replace(/[\s_-]+$/, '') || (names.length === 1 ? names[0] : 'pistas');
-    let mix = null, L = null, R = null;
+    const m = {};
     for (let i = 0; i < files.length; i++) {
       lbl.textContent = `⏳ Analizando ${i + 1} de ${files.length}…`;
       let buf;
-      try { buf = await actx.decodeAudioData(await files[i].arrayBuffer()); }
+      try { buf = await decodeFile(files[i]); }
       catch (e) { showErr('No se pudo leer ' + files[i].name); continue; }
-      if (!mix || buf.length > mix.length) {
-        const m = actx.createBuffer(2, buf.length, actx.sampleRate);
-        if (mix) { m.getChannelData(0).set(L); m.getChannelData(1).set(R); }
-        mix = m; L = mix.getChannelData(0); R = mix.getChannelData(1);
-      }
       const a = buf.getChannelData(0), b = buf.numberOfChannels > 1 ? buf.getChannelData(1) : a;
       const step = buf.sampleRate / BAR_RATE, peaks = new Float32Array(Math.ceil(buf.length / step));
       let max = 0;
       for (let k = 0; k < buf.length; k++) {
-        L[k] += a[k]; R[k] += b[k];
         const v = Math.max(Math.abs(a[k]), Math.abs(b[k])), j = (k / step) | 0;
         if (v > peaks[j]) { peaks[j] = v; if (v > max) max = v; }
       }
       const spans = activeSpans(peaks, max);
       if (!spans.length) continue;                                   // pista vacía
+      sumInto(m, buf);
       for (let j = 0; j < peaks.length; j++) peaks[j] = Math.pow(peaks[j] / max, 0.8);
-      const tr = { name: names[i].slice(pre.length).trim() || names[i], peaks, spans };
+      const tr = { file: files[i], name: names[i].slice(pre.length).trim() || names[i], peaks, slow: slowOf(peaks), spans, group: null };
       setStemColor(tr, STEM_COLORS[stems.tracks.length % STEM_COLORS.length]);
+      tr.own = tr.color;
       stems.tracks.push(tr);
+      stems.tdur = Math.max(stems.tdur, buf.duration);
     }
+    finishMix(m);
+    restoreSetup();
     stems.loading = false;
-    if (stems.tracks.length) {
-      // Si la suma de las pistas pasa de 0 dB, se baja lo justo para que no sature
-      let pk = 0;
-      for (let k = 0; k < L.length; k++) { const v = Math.max(Math.abs(L[k]), Math.abs(R[k])); if (v > pk) pk = v; }
-      Object.assign(stems, { mix, gain: pk > 0.98 ? 0.98 / pk : 1, dur: mix.duration });
-      lbl.textContent = `🎚 ${stems.tracks.length} ${stems.tracks.length === 1 ? 'pista' : 'pistas'} · ${fmt(stems.dur)}`;
-    } else lbl.textContent = '🎚 Elegir las pistas…';
+    paintFilesLbl();
+    rebuildBands(); syncStems();
+  }
+  function paintFilesLbl() {
+    const n = stems.tracks.length;
+    $('#stemsFilesLbl').firstChild.textContent = n ? `🎚 ${n} ${n === 1 ? 'pista' : 'pistas'} · ${fmt(stems.tdur)}` : '🎚 Elegir las pistas…';
+  }
+
+  // Nombres, colores y grupos se recuerdan por nombre de archivo, para no rearmarlos al volver a cargar las pistas
+  function saveSetup() {
+    const tracks = {};
+    for (const tr of stems.tracks) tracks[tr.file.name] = { name: tr.name, color: tr.own, g: stems.groups.indexOf(tr.group) };
+    settings.stemsSetup = { groups: stems.groups.map(({ name, color, merge }) => ({ name, color, merge })), tracks };
+    save();
+  }
+  function restoreSetup() {
+    const sv = settings.stemsSetup;
+    if (!sv || !sv.tracks || !stems.tracks.some(tr => sv.tracks[tr.file.name])) return;
+    const groups = (sv.groups || []).map(g => ({ name: String(g.name), color: g.color, merge: !!g.merge }));
+    for (const tr of stems.tracks) {
+      const o = sv.tracks[tr.file.name];
+      if (!o) continue;
+      tr.name = String(o.name); tr.own = o.color; tr.group = groups[o.g] || null;
+      setStemColor(tr, tr.group ? tr.group.color : tr.own);
+    }
+    stems.groups = groups.filter(g => stems.tracks.some(tr => tr.group === g));
+  }
+
+  // Bandas que se dibujan: una por pista, salvo los grupos marcados como "1 banda", que se funden en una sola.
+  // Las pistas de un grupo quedan juntas, en el lugar de la primera.
+  function rebuildBands() {
+    const done = new Set();
+    stems.bands = [];
+    for (const tr of stems.tracks) {
+      const g = tr.group;
+      if (!g) { stems.bands.push(tr); continue; }
+      if (done.has(g)) continue;
+      done.add(g);
+      const mem = stems.tracks.filter(x => x.group === g);
+      if (!g.merge || mem.length < 2) { stems.bands.push(...mem); continue; }
+      const peaks = new Float32Array(Math.max(...mem.map(x => x.peaks.length))), spans = [];
+      for (const x of mem) for (let j = 0; j < x.peaks.length; j++) if (x.peaks[j] > peaks[j]) peaks[j] = x.peaks[j];
+      for (const s of mem.flatMap(x => x.spans).sort((a, b) => a[0] - b[0])) {
+        const last = spans[spans.length - 1];
+        if (last && s[0] - last[1] < 3) last[1] = Math.max(last[1], s[1]); else spans.push([s[0], s[1]]);
+      }
+      const band = { name: g.name, peaks, slow: slowOf(peaks), spans };
+      setStemColor(band, g.color);
+      stems.bands.push(band);
+    }
+  }
+  function stemsChanged() { rebuildBands(); saveSetup(); paintStems(); }
+  function setGroup(tr, g) {
+    tr.group = g;
+    setStemColor(tr, g ? g.color : tr.own);
+    stems.groups = stems.groups.filter(x => stems.tracks.some(t => t.group === x));
+    stemsChanged();
+  }
+  function setGroupColor(g, hex) {
+    g.color = hex;
+    if (g.colEl) g.colEl.value = hex;
+    for (const x of stems.tracks) if (x.group === g) { setStemColor(x, hex); x.colEl.value = hex; }
+    rebuildBands(); saveSetup();
+  }
+  function removeTrack(tr) {
+    if (reel.recording || stems.loading) return;
+    stopStems();
+    if (stems.solo === tr) stems.solo = stems.soloBuf = null;
+    stems.tracks.splice(stems.tracks.indexOf(tr), 1);
+    stems.groups = stems.groups.filter(x => stems.tracks.some(t => t.group === x));
+    stems.mix = null;                                                // la mezcla se rehace sin esa pista al reproducir
+    if (!stems.tracks.length) { stems.tdur = 0; syncStems(); }
+    paintFilesLbl();
+    stemsChanged();
+  }
+  // 🎧 Escuchar una pista sola (aunque haya master), para reconocerla; se decodifica en el momento
+  async function toggleSolo(tr) {
+    if (reel.recording || stems.loading) return;
+    const t = stemsTime();
+    stopStems();
+    if (stems.solo === tr) stems.solo = stems.soloBuf = null;
+    else {
+      stems.loading = true;
+      try { stems.soloBuf = await decodeFile(tr.file); stems.solo = tr; }
+      catch (e) { showErr('No se pudo leer ' + tr.file.name); stems.solo = stems.soloBuf = null; }
+      stems.loading = false;
+    }
+    paintStems();
+    playStems(t);
+  }
+
+  // Master opcional: es lo que se escucha (con el procesado final de la mezcla); las pistas sólo se dibujan
+  async function loadMaster(file) {
+    if (reel.recording) return;
+    stopStems(); ensureCtx();
+    const lbl = $('#stemsMasterLbl').firstChild;
+    lbl.textContent = '⏳ Leyendo el master…';
+    try {
+      stems.master = await decodeFile(file);
+      lbl.textContent = '🎧 ' + file.name.replace(/\.[^.]+$/, '');
+    } catch (e) { showErr('No se pudo leer ' + file.name); stems.master = null; lbl.textContent = '🎧 Master (opcional)…'; }
+    syncStems();
+  }
+  function syncStems() {
+    stems.dur = stems.master ? stems.master.duration : stems.tdur;
+    stems.t = Math.min(stems.t, stems.dur);
+    if (stems.master && stems.tdur && Math.abs(stems.master.duration - stems.tdur) > 0.5)
+      showErr('El master y las pistas no duran lo mismo: exportalos con la misma selección para que queden alineados.');
     paintStems();
   }
 
   function paintStems() {
-    const box = $('#stemsList');
-    box.textContent = '';
+    const el = (tag, props) => Object.assign(document.createElement(tag), props);
+    const box = $('#stemsList'), gbox = $('#stemsGroups');
+    box.textContent = ''; gbox.textContent = '';
     for (const tr of stems.tracks) {
-      const row = document.createElement('div');
-      row.className = 'trk';
-      const col = Object.assign(document.createElement('input'), { type: 'color', value: tr.color, title: 'Color de la pista' });
-      const name = Object.assign(document.createElement('input'), { type: 'text', value: tr.name, maxLength: 40, title: 'Nombre de la pista' });
-      col.addEventListener('input', () => setStemColor(tr, col.value));
-      name.addEventListener('input', () => { tr.name = name.value; });
-      row.append(col, name);
+      const row = el('div', { className: 'trk' });
+      const col = tr.colEl = el('input', { type: 'color', value: tr.color, title: tr.group ? 'Color del grupo' : 'Color de la pista' });
+      const name = el('input', { type: 'text', value: tr.name, maxLength: 40, title: 'Nombre de la pista' });
+      const grp = el('select', { title: 'Grupo: las pistas de un grupo comparten color y quedan juntas' });
+      grp.add(new Option('Sin grupo', ''));
+      stems.groups.forEach((g, i) => grp.add(new Option(g.name, i)));
+      grp.add(new Option('＋ Grupo nuevo', 'new'));
+      grp.value = tr.group ? stems.groups.indexOf(tr.group) : '';
+      const solo = el('button', { textContent: '🎧', title: 'Escuchar sólo esta pista', className: stems.solo === tr ? 'on' : '' });
+      const del = el('button', { textContent: '✕', title: 'Quitar esta pista (del video y de la mezcla)' });
+      col.addEventListener('input', () => {
+        if (tr.group) return setGroupColor(tr.group, col.value);
+        tr.own = col.value; setStemColor(tr, col.value); saveSetup();
+      });
+      name.addEventListener('input', () => { tr.name = name.value; saveSetup(); });
+      grp.addEventListener('change', () => {
+        if (grp.value !== 'new') return setGroup(tr, grp.value === '' ? null : stems.groups[grp.value]);
+        const g = { name: 'Grupo ' + (stems.groups.length + 1), color: tr.color, merge: false };
+        stems.groups.push(g);
+        setGroup(tr, g);
+        g.nameEl.focus(); g.nameEl.select();                         // para ponerle nombre enseguida
+      });
+      solo.addEventListener('click', () => toggleSolo(tr));
+      del.addEventListener('click', () => removeTrack(tr));
+      row.append(col, name, grp, solo, del);
       box.appendChild(row);
     }
-    $('#stemsGo').disabled = $('#stemsPlay').disabled = !stems.mix;
+    if (stems.groups.length) gbox.append(el('h3', { textContent: 'Grupos' }));
+    stems.groups.forEach((g, i) => {
+      const row = el('div', { className: 'trk' });
+      const col = g.colEl = el('input', { type: 'color', value: g.color, title: 'Color del grupo' });
+      const name = g.nameEl = el('input', { type: 'text', value: g.name, maxLength: 40, title: 'Nombre del grupo' });
+      const one = el('label', { className: 'chk', title: 'Dibujar todo el grupo como una sola banda, con el nombre del grupo' });
+      const chk = el('input', { type: 'checkbox', checked: g.merge });
+      one.append(chk, '1 banda');
+      const del = el('button', { textContent: '✕', title: 'Desarmar el grupo (las pistas quedan)' });
+      col.addEventListener('input', () => setGroupColor(g, col.value));
+      name.addEventListener('input', () => {
+        g.name = name.value;
+        box.querySelectorAll('select').forEach(s => { s.options[i + 1].text = g.name; });
+        rebuildBands(); saveSetup();
+      });
+      chk.addEventListener('change', () => { g.merge = chk.checked; rebuildBands(); saveSetup(); });
+      del.addEventListener('click', () => {
+        for (const x of stems.tracks) if (x.group === g) { x.group = null; setStemColor(x, x.own); }
+        stems.groups.splice(i, 1);
+        stemsChanged();
+      });
+      row.append(col, name, one, del);
+      gbox.appendChild(row);
+    });
+    $('#stemsMasterX').hidden = !stems.master;
+    $('#stemsGo').disabled = $('#stemsPlay').disabled = !stems.tracks.length || stems.loading;
     $('#stemsPlay').textContent = stems.playing ? '⏸' : '▶';
   }
 
@@ -2482,16 +2720,57 @@ void main() {
     fc.drawImage(bg, -8, -8, 214, 368);
   }
 
+  // Textos: cada uno tiene momento (t), duración (d), tamaño (0 chico, 1 normal, 2 grande) y el texto (s)
+  const parseTime = v => {
+    const m = String(v).trim().match(/^(?:(\d+):)?(\d+(?:[.,]\d+)?)$/);
+    return m ? (+m[1] || 0) * 60 + +m[2].replace(',', '.') : null;
+  };
+  const fmtT = t => Math.floor(t / 60) + ':' + (t % 60 < 10 ? '0' : '') + +(t % 60).toFixed(1);
+  const autoDur = s => Math.round((2 + s.length * 0.07) * 2) / 2;       // tiempo cómodo para leerlo
+  // Lista pegada, una línea por texto: "0:22 bueno, antes de que te aburras"
   function parseStemTexts(src) {
     const out = [];
     for (const line of src.split('\n')) {
-      const m = line.match(/^\s*(?:(\d+):)?(\d+)(?:[.,](\d+))?\s+(\S.*)$/);
-      if (m) out.push({ t: (+m[1] || 0) * 60 + +m[2] + +('0.' + (m[3] || 0)), s: m[4].trim(), lines: null });
+      const m = line.match(/^\s*([\d:.,]+)\s+(\S.*)$/), t = m && parseTime(m[1]);
+      if (t !== null) out.push({ t, d: autoDur(m[2].trim()), size: 1, s: m[2].trim() });
     }
-    out.sort((a, b) => a.t - b.t);
-    // cada texto dura según su largo, pero se va antes de que entre el siguiente
-    out.forEach((x, i) => { x.end = Math.max(x.t + 0.6, Math.min(x.t + 2 + x.s.length * 0.07, i + 1 < out.length ? out[i + 1].t - 0.5 : Infinity)); });
     return out;
+  }
+  function saveTexts() { settings.stemsTexts = stems.texts.map(({ t, d, size, s }) => ({ t, d, size, s })); save(); }
+  function paintTexts() {
+    const box = $('#stemsTexts'), el = (tag, props) => Object.assign(document.createElement(tag), props);
+    box.textContent = '';
+    stems.texts.sort((a, b) => a.t - b.t);
+    for (const x of stems.texts) {
+      const row = el('div', { className: 'txt' }), top = el('div', { className: 'top' });
+      const time = el('input', { type: 'text', value: fmtT(x.t), title: 'Cuándo aparece (min:seg)' });
+      const now = el('button', { textContent: '⏱', title: 'Que aparezca en el momento actual de la barra' });
+      const dur = el('input', { type: 'number', min: 0.5, max: 120, step: 0.5, value: x.d, title: 'Cuántos segundos queda en pantalla' });
+      const size = el('select', { title: 'Tamaño' });
+      ['Chico', 'Normal', 'Grande'].forEach((n, i) => size.add(new Option(n, i)));
+      size.value = x.size;
+      const del = el('button', { textContent: '✕', title: 'Quitar este texto' });
+      const text = el('input', { type: 'text', value: x.s, placeholder: 'Escribí el texto…', maxLength: 140 });
+      const show = () => { if (!stems.playing && stems.dur) { stems.t = Math.min(stems.dur, x.t + 0.5); seek.value = stems.t / stems.dur; } };
+      time.addEventListener('change', () => { const t = parseTime(time.value); if (t !== null) x.t = t; paintTexts(); show(); });
+      now.addEventListener('click', () => { x.t = Math.round(stemsTime() * 10) / 10; paintTexts(); });
+      dur.addEventListener('input', () => { x.d = Math.max(0.5, +dur.value || 0.5); saveTexts(); });
+      size.addEventListener('change', () => { x.size = +size.value; saveTexts(); show(); });
+      del.addEventListener('click', () => { stems.texts.splice(stems.texts.indexOf(x), 1); paintTexts(); });
+      text.addEventListener('focus', show);                            // al editarlo, la vista previa lo muestra
+      text.addEventListener('input', () => { x.s = text.value; saveTexts(); });
+      text.addEventListener('paste', e => {
+        const list = parseStemTexts((e.clipboardData || window.clipboardData).getData('text'));
+        if (list.length < 2) return;
+        e.preventDefault();
+        if (!x.s) stems.texts.splice(stems.texts.indexOf(x), 1);
+        stems.texts.push(...list); paintTexts();
+      });
+      top.append(time, now, dur, 's', size, del);
+      row.append(top, text);
+      box.appendChild(row);
+    }
+    saveTexts();
   }
 
   function drawBand(tr, t, x, y, W, H, v) {
@@ -2504,12 +2783,16 @@ void main() {
       for (let j = a; j <= b; j++) { const h = Math.max(2, pk[j] * amp); rg.rect(off + j * BAR_PX, mid - h / 2, 3, h); }
     };
     rg.save();
-    rg.globalAlpha = smooth((v - 0.45) / 0.55);                    // primero se abre el lugar y después aparece la banda
+    rg.globalAlpha = smooth((v - 0.45) / 0.55) * (settings.stemsAlpha || 1);   // primero se abre el lugar y después aparece la banda
+    if (settings.stemsFx === 'pulse' && k >= 2) {                  // latido: la banda entera crece un poco con su volumen
+      const s = 1 + 0.045 * (pk[k] + pk[k - 1] + pk[k - 2]) / 3;
+      rg.translate(c, mid); rg.scale(s, s); rg.translate(-c, -mid);
+    }
     rr(x, y, W, H, Math.min(26, H / 2), rg);
     rg.save();
     rg.clip();
     // vidrio esmerilado: el mismo fondo, desenfocado, con un velo claro y un toque del color de la pista
-    rg.drawImage(stems.frost, stems.bx, stems.by, stems.bw, stems.bh);
+    rg.drawImage(stems.glass, stems.bx, stems.by, stems.bw, stems.bh);
     rg.fillStyle = 'rgba(255,255,255,.1)'; rg.fillRect(x, y, W, H);
     rg.fillStyle = `rgba(${tr.tint},.16)`; rg.fillRect(x, y, W, H);
     // la onda viene desde la derecha, brilla al pasar por el cursor (centro) y se apaga hacia la izquierda
@@ -2542,13 +2825,38 @@ void main() {
   }
 
   function composeStems() {
-    const now = performance.now(), t = stemsTime(), n = stems.tracks.length;
-    if (!stems.bg) buildStemsBg();
+    const now = performance.now(), t = stemsTime(), n = stems.bands.length;
     rg.globalAlpha = 1;
     rg.imageSmoothingEnabled = true; rg.imageSmoothingQuality = 'high';
-    const z = 1 + (settings.stemsZoom !== false && stems.dur ? 0.08 * Math.min(1, t / stems.dur) : 0);
-    stems.bw = RW * z; stems.bh = RH * z; stems.bx = (RW - stems.bw) / 2; stems.by = (RH - stems.bh) / 2;
-    rg.drawImage(stems.bg, stems.bx, stems.by, stems.bw, stems.bh);
+    const vid = settings.stemsBg === 'video' && stems.video;
+    if (settings.stemsBg === 'scene' || vid) {
+      const mk = (w, h) => Object.assign(document.createElement('canvas'), { width: w, height: h });
+      if (!stems.live) { stems.live = mk(198, 352); stems.vfill = mk(135, 240); }
+      if (vid) {
+        // Fondo: el video a todo el ancho; si no es vertical, relleno desenfocado de sí mismo arriba y abajo
+        const vw = vid.videoWidth, vh = vid.videoHeight, ph = RW * vh / vw;
+        if (ph < RH - 2) {
+          const fc = stems.vfill.getContext('2d'), s = Math.max(135 / vw, 240 / vh) * 1.2;
+          fc.filter = 'blur(4px)';
+          fc.drawImage(vid, (135 - vw * s) / 2, (240 - vh * s) / 2, vw * s, vh * s);
+          rg.drawImage(stems.vfill, 0, 0, RW, RH);
+          rg.fillStyle = 'rgba(0,0,0,.4)'; rg.fillRect(0, 0, RW, RH);
+        }
+        rg.drawImage(vid, 0, (RH - ph) / 2, RW, ph);
+      } else rg.drawImage(settings.mode === 'santi' ? c2 : canvas, 0, 0, RW, RH);   // el visual elegido, que reacciona al audio
+      // el vidrio de las bandas es este mismo cuadro, desenfocado
+      Object.assign(stems, { bx: 0, by: 0, bw: RW, bh: RH });
+      const lc = stems.live.getContext('2d');
+      lc.filter = 'blur(5px)';
+      lc.drawImage(recC, -8, -8, 214, 368);
+      stems.glass = stems.live;
+    } else {
+      if (!stems.bg) buildStemsBg();
+      const z = 1 + (settings.stemsZoom !== false && stems.dur ? 0.08 * Math.min(1, t / stems.dur) : 0);
+      stems.bw = RW * z; stems.bh = RH * z; stems.bx = (RW - stems.bw) / 2; stems.by = (RH - stems.bh) / 2;
+      rg.drawImage(stems.bg, stems.bx, stems.by, stems.bw, stems.bh);
+      stems.glass = stems.frost;
+    }
     const tg = rg.createLinearGradient(0, 0, 0, 640);
     tg.addColorStop(0, 'rgba(0,0,0,.45)'); tg.addColorStop(1, 'rgba(0,0,0,0)');
     rg.fillStyle = tg; rg.fillRect(0, 0, RW, 640);
@@ -2556,17 +2864,29 @@ void main() {
     // Bandas: se apilan desde abajo (por encima de la zona que tapa Instagram); cada una ocupa lugar según su presencia
     const X = 40, W = RW - 2 * X, GAP = 14, BOTTOM = 1500;
     const H = Math.max(48, Math.min(120, (980 - GAP * (n - 1)) / n));
+    // Efectos de zoom: la pista destacada se hace más alta y las demás le hacen lugar
+    const fx = settings.stemsFx || 'enter', jn = Math.max(0, Math.floor(t * BAR_RATE));
+    let tot = 0;
+    if (fx === 'focus') for (const tr of stems.bands) tot += (tr.slow[jn] || 0) ** 2;
+    const zoomOf = tr => {
+      if (fx === 'focus') return tot > 1e-4 ? 0.75 + (tr.slow[jn] || 0) ** 2 / tot : 1;
+      if (fx !== 'enter') return 1;
+      let b = 0;                                                   // unos segundos de zoom cada vez que la pista entra
+      for (const s of tr.spans) if (s[0] > 0.5) b = Math.max(b, smooth((t - s[0] + 1.2) / 0.6) * (1 - smooth((t - s[0] - 1.5) / 1.5)));
+      return 1 + 0.6 * b;
+    };
     let y = BOTTOM, seen = 0;
     for (let i = n - 1; i >= 0; i--) {
-      const tr = stems.tracks[i], v = visOf(tr, t);
+      const tr = stems.bands[i], v = visOf(tr, t);
       if (v < 0.004) continue;
-      y -= (H + GAP) * v;
+      const h = H * zoomOf(tr);
+      y -= (h + GAP) * v;
       seen = Math.max(seen, v);
-      drawBand(tr, t, X + (1 - v) * 90, y, W, H, v);
+      drawBand(tr, t, X + (1 - v) * 90, y, W, h, v);
     }
     if (seen > 0) {                                                // cursor fijo en el centro
       rg.save();
-      rg.globalAlpha = seen;
+      rg.globalAlpha = seen * (0.4 + 0.6 * (settings.stemsAlpha || 1));
       rg.shadowColor = '#fff'; rg.shadowBlur = 14;
       rg.fillStyle = 'rgba(255,255,255,.92)';
       rg.fillRect(RW / 2 - 1, y - 10, 2, BOTTOM - GAP - y + 20);
@@ -2574,15 +2894,18 @@ void main() {
     }
 
     // Textos: arriba y centrados, fuera de la zona que tapa Instagram
+    // Si dos coinciden, el segundo se apila debajo del primero
+    let ty = 240;
     for (const x of stems.texts) {
-      const a = smooth((t - x.t) / 0.35) * (1 - smooth((t - x.end) / 0.45));
-      if (a < 0.01) continue;
+      const a = smooth((t - x.t) / 0.35) * (1 - smooth((t - x.t - x.d) / 0.45));
+      if (a < 0.01 || !x.s.trim()) continue;
+      const px = [42, 58, 82][x.size] || 58, lh = px * 1.28;
       rg.save();
-      rg.font = '700 58px "Segoe UI", system-ui, -apple-system, sans-serif';
-      if (!x.lines) {
-        x.lines = [];
+      rg.font = `700 ${px}px "Segoe UI", system-ui, -apple-system, sans-serif`;
+      if (x.key !== px + x.s) {
+        x.key = px + x.s; x.lines = [];
         let cur = '';
-        for (const w of x.s.split(/\s+/)) {
+        for (const w of x.s.trim().split(/\s+/)) {
           const nx = cur ? cur + ' ' + w : w;
           if (cur && rg.measureText(nx).width > RW - 168) { x.lines.push(cur); cur = w; } else cur = nx;
         }
@@ -2592,30 +2915,67 @@ void main() {
       rg.textAlign = 'center'; rg.textBaseline = 'alphabetic';
       rg.shadowColor = 'rgba(0,0,0,.7)'; rg.shadowBlur = 26;
       rg.fillStyle = '#fff';
-      x.lines.forEach((l, i) => rg.fillText(l, RW / 2, 300 + i * 74 + 14 * (1 - a), RW - 120));
+      x.lines.forEach((l, i) => rg.fillText(l, RW / 2, ty + px + i * lh + 14 * (1 - a), RW - 120));
       rg.restore();
+      ty += (x.lines.length * lh + 16) * a;
     }
 
     const sec = Math.floor(t);
     if (stems.playing) seek.value = t / stems.dur;
-    if (sec !== stems.shownSec) { stems.shownSec = sec; $('#stemsClock').textContent = fmt(sec); }
+    if (sec !== stems.shownSec) {
+      stems.shownSec = sec;
+      $('#stemsClock').textContent = fmt(sec);
+      $('#stemsAddText').textContent = '＋ Texto en ' + fmt(sec);
+    }
     recOverlay(now, t, stems.dur);
   }
 
-  // Reproduce la mezcla desde `from`; con `dest` además la manda al grabador
-  function playStems(from, dest) {
-    stopCurrent(); source = 'none'; ensureCtx();
+  // Video de fondo: sin sonido, en bucle, siguiendo la posición del tema
+  function loadStemsVideo(file) {
+    const v = document.createElement('video'), url = URL.createObjectURL(file);
+    Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'auto' });
+    v.onloadeddata = () => {
+      if (stems.video) { stems.video.pause(); URL.revokeObjectURL(stems.video.src); }
+      stems.video = v;
+      $('#stemsVideoLbl').firstChild.textContent = '🎞 ' + file.name.replace(/\.[^.]+$/, '');
+      syncVideo(stems.playing, stemsTime());
+    };
+    v.onerror = () => { URL.revokeObjectURL(url); showErr('Este navegador no puede abrir ese video. Probá con un .mp4.'); };
+    v.src = url;
+  }
+  function syncVideo(play, t) {
+    const v = stems.video;
+    if (!v) return;
+    if (settings.stemsBg !== 'video') { v.pause(); return; }
+    if (v.duration) v.currentTime = t % v.duration;
+    if (play) v.play().catch(() => {}); else v.pause();
+  }
+
+  // Reproduce desde `from` la pista en solo, el master o la mezcla; con `dest` además lo manda al grabador
+  async function playStems(from, dest) {
+    if (stems.loading || !stems.tracks.length) return false;
+    stopCurrent(); ensureCtx();
+    if (dest) stems.solo = stems.soloBuf = null;                   // el video siempre se graba con el tema completo
+    if (!stems.solo && !stems.master && !stems.mix) await buildMix();
+    const buffer = stems.soloBuf || stems.master || stems.mix;
+    if (!buffer) return false;
+    stopStems();
+    from = Math.max(0, Math.min(from, buffer.duration - 0.05));
     const node = actx.createBufferSource(), out = actx.createGain();
-    node.buffer = stems.mix; out.gain.value = stems.gain;
+    node.buffer = buffer; out.gain.value = buffer === stems.mix ? stems.gain : 1;
     node.connect(out); out.connect(actx.destination);
+    out.connect(analyser); source = 'analyser'; tapEssentia();     // para que el visual de fondo reaccione
+    setStatus('🎚 ' + (stems.solo ? stems.solo.name : stems.name).slice(0, 28));
     if (dest) out.connect(dest);
     const lead = dest ? 0.35 : 0.05;
     stems.at = actx.currentTime + lead - from;
     node.start(actx.currentTime + lead, from);
-    node.onended = () => { if (reel.recording) endReel(); else { stopStems(); stems.t = 0; seek.value = 0; } };
+    node.onended = () => { if (reel.recording) endReel(); else { stopStems(); stems.t = 0; seek.value = 0; syncVideo(false, 0); } };
     Object.assign(stems, { node, out, playing: true });
     current = { stop: stopStems };
+    syncVideo(true, from);
     paintStems(); keepAwake();
+    return true;
   }
   function stopStems() {
     if (!stems.node) return;
@@ -2625,30 +2985,58 @@ void main() {
     node.onended = null;
     try { node.stop(); } catch {}
     node.disconnect(); out.disconnect();
+    syncVideo(false, stems.t);
     paintStems();
   }
-  function recordStems() {
-    if (!stems.mix || reel.recording || !canRecord()) return;
+  async function recordStems() {
+    if (!stems.tracks.length || reel.recording || !canRecord()) return;
     ensureCtx();
     const dest = actx.createMediaStreamDestination();
-    playStems(0, dest);
-    recordCanvas(dest, () => stems.name, stopStems);
+    if (await playStems(0, dest)) recordCanvas(dest, () => stems.name, stopStems);
   }
 
   $('#stemsBtn').addEventListener('click', () => setReel(true, 'stems'));
   $('#stemsClose').addEventListener('click', () => setReel(false));
   $('#stemsGo').addEventListener('click', recordStems);
-  $('#stemsPlay').addEventListener('click', () => { if (stems.playing) stopStems(); else if (stems.mix) playStems(stems.t >= stems.dur - 0.05 ? 0 : stems.t); });
+  $('#stemsPlay').addEventListener('click', () => { if (stems.playing) stopStems(); else playStems(stems.t >= stems.dur - 0.05 ? 0 : stems.t); });
   seek.addEventListener('input', () => {
-    if (!stems.mix) return;
+    if (!stems.dur) return;
     const to = seek.value * stems.dur;
-    if (stems.playing) playStems(Math.min(to, stems.dur - 0.05)); else stems.t = to;
+    if (stems.playing) playStems(to); else { stems.t = to; syncVideo(false, to); }
   });
   $('#stemsPhoto').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadStemsPhoto(f); });
   $('#stemsFiles').addEventListener('change', e => { const fs = [...e.target.files]; e.target.value = ''; loadStems(fs); });
-  $('#stemsText').value = settings.stemsText || '';
-  stems.texts = parseStemTexts($('#stemsText').value);
-  $('#stemsText').addEventListener('input', e => { settings.stemsText = e.target.value; stems.texts = parseStemTexts(e.target.value); save(); });
+  $('#stemsMaster').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadMaster(f); });
+  $('#stemsMasterX').addEventListener('click', () => {
+    if (reel.recording) return;
+    stopStems(); stems.master = null;
+    $('#stemsMasterLbl').firstChild.textContent = '🎧 Master (opcional)…';
+    syncStems();
+  });
+  function setStemsBg(kind) {
+    settings.stemsBg = kind; save();
+    document.querySelectorAll('#stemsBg button').forEach(b => b.classList.toggle('on', b.dataset.bg === kind));
+    $('#stemsPhotoLbl').hidden = $('#stemsZoomLbl').hidden = kind !== 'photo';
+    $('#stemsVideoLbl').hidden = kind !== 'video';
+    $('#stemsMode').hidden = kind !== 'scene';
+    syncVideo(stems.playing, stemsTime());
+  }
+  setStemsBg(['scene', 'video'].includes(settings.stemsBg) ? settings.stemsBg : 'photo');
+  $('#stemsVideo').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadStemsVideo(f); });
+  document.querySelectorAll('#stemsBg button').forEach(b => b.addEventListener('click', () => setStemsBg(b.dataset.bg)));
+  $('#stemsMode').addEventListener('change', e => setMode(e.target.value));
+  $('#stemsAlpha').value = settings.stemsAlpha || 1;
+  $('#stemsAlpha').addEventListener('input', e => { settings.stemsAlpha = +e.target.value; save(); });
+  $('#stemsFx').value = settings.stemsFx || 'enter';
+  $('#stemsFx').addEventListener('change', e => { settings.stemsFx = e.target.value; save(); });
+  stems.texts = (settings.stemsTexts || parseStemTexts(settings.stemsText || '')).map(x => ({ t: +x.t || 0, d: +x.d || 3, size: x.size === 0 || x.size === 2 ? x.size : 1, s: String(x.s || '') }));
+  paintTexts();
+  $('#stemsAddText').addEventListener('click', () => {
+    stems.texts.push({ t: Math.round(stemsTime() * 10) / 10, d: 3, size: 1, s: '' });
+    paintTexts();
+    const rows = $('#stemsTexts').children, i = stems.texts.findIndex(x => !x.s);
+    if (rows[i]) rows[i].lastChild.focus();
+  });
   $('#stemsZoom').checked = settings.stemsZoom !== false;
   $('#stemsZoom').addEventListener('change', e => { settings.stemsZoom = e.target.checked; save(); });
   if (params.has('pistas')) setReel(true, 'stems');
