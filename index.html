@@ -219,6 +219,7 @@
     <button id="stemsMasterX" title="Quitar el master" hidden>✕</button>
   </div>
   <p class="note">Con master se escucha el master (tu mezcla final) y las pistas sólo se dibujan. Sin master suena la suma de las pistas.</p>
+  <label class="chk" id="stemsSplitLbl" title="El visual queda en la mitad de arriba y las pistas se acomodan en la de abajo"><input type="checkbox" id="stemsSplit"> Visual arriba, pistas abajo</label>
   <h3>Pistas</h3>
   <div id="stemsList"></div>
   <div id="stemsGroups"></div>
@@ -2829,6 +2830,7 @@ void main() {
     rg.globalAlpha = 1;
     rg.imageSmoothingEnabled = true; rg.imageSmoothingQuality = 'high';
     const vid = settings.stemsBg === 'video' && stems.video;
+    const split = settings.stemsBg === 'scene' && !!settings.stemsSplit;   // visual en la mitad de arriba, pistas en la de abajo
     if (settings.stemsBg === 'scene' || vid) {
       const mk = (w, h) => Object.assign(document.createElement('canvas'), { width: w, height: h });
       if (!stems.live) { stems.live = mk(198, 352); stems.vfill = mk(135, 240); }
@@ -2843,7 +2845,18 @@ void main() {
           rg.fillStyle = 'rgba(0,0,0,.4)'; rg.fillRect(0, 0, RW, RH);
         }
         rg.drawImage(vid, 0, (RH - ph) / 2, RW, ph);
-      } else rg.drawImage(settings.mode === 'santi' ? c2 : canvas, 0, 0, RW, RH);   // el visual elegido, que reacciona al audio
+      } else {
+        const src = settings.mode === 'santi' ? c2 : canvas;       // el visual elegido, que reacciona al audio
+        if (split) {
+          // se sube un cuarto de pantalla: el centro del visual queda en el medio de la mitad de arriba,
+          // y hacia abajo se funde a negro, donde van las pistas
+          rg.fillStyle = '#000'; rg.fillRect(0, 0, RW, RH);
+          rg.drawImage(src, 0, src.height / 4, src.width, src.height * 0.75, 0, 0, RW, RH * 0.75);
+          const fg = rg.createLinearGradient(0, 1000, 0, RH * 0.75);
+          fg.addColorStop(0, 'rgba(0,0,0,0)'); fg.addColorStop(1, '#000');
+          rg.fillStyle = fg; rg.fillRect(0, 1000, RW, RH * 0.75 - 1000);
+        } else rg.drawImage(src, 0, 0, RW, RH);
+      }
       // el vidrio de las bandas es este mismo cuadro, desenfocado
       Object.assign(stems, { bx: 0, by: 0, bw: RW, bh: RH });
       const lc = stems.live.getContext('2d');
@@ -2863,7 +2876,8 @@ void main() {
 
     // Bandas: se apilan desde abajo (por encima de la zona que tapa Instagram); cada una ocupa lugar según su presencia
     const X = 40, W = RW - 2 * X, GAP = 14, BOTTOM = 1500;
-    const H = Math.max(48, Math.min(120, (980 - GAP * (n - 1)) / n));
+    const AVAIL = split ? 530 : 980;                               // alto disponible para las bandas
+    const H = Math.max(split ? 34 : 48, Math.min(120, (AVAIL - GAP * (n - 1)) / n));
     // Efectos de zoom: la pista destacada se hace más alta y las demás le hacen lugar
     const fx = settings.stemsFx || 'enter', jn = Math.max(0, Math.floor(t * BAR_RATE));
     let tot = 0;
@@ -2875,11 +2889,18 @@ void main() {
       for (const s of tr.spans) if (s[0] > 0.5) b = Math.max(b, smooth((t - s[0] + 1.2) / 0.6) * (1 - smooth((t - s[0] - 1.5) / 1.5)));
       return 1 + 0.6 * b;
     };
+    // En mitades, si con los zooms las bandas no entran en su mitad, se achican todas lo justo
+    let fit = 1;
+    if (split) {
+      let sh = 0, sv = 0;
+      for (const tr of stems.bands) { const v = visOf(tr, t); if (v >= 0.004) { sh += H * zoomOf(tr) * v; sv += v; } }
+      if (sh + GAP * sv > AVAIL) fit = Math.max(0.3, (AVAIL - GAP * sv) / sh);
+    }
     let y = BOTTOM, seen = 0;
     for (let i = n - 1; i >= 0; i--) {
       const tr = stems.bands[i], v = visOf(tr, t);
       if (v < 0.004) continue;
-      const h = H * zoomOf(tr);
+      const h = H * zoomOf(tr) * fit;
       y -= (h + GAP) * v;
       seen = Math.max(seen, v);
       drawBand(tr, t, X + (1 - v) * 90, y, W, h, v);
@@ -3018,7 +3039,7 @@ void main() {
     document.querySelectorAll('#stemsBg button').forEach(b => b.classList.toggle('on', b.dataset.bg === kind));
     $('#stemsPhotoLbl').hidden = $('#stemsZoomLbl').hidden = kind !== 'photo';
     $('#stemsVideoLbl').hidden = kind !== 'video';
-    $('#stemsMode').hidden = kind !== 'scene';
+    $('#stemsMode').hidden = $('#stemsSplitLbl').hidden = kind !== 'scene';
     syncVideo(stems.playing, stemsTime());
   }
   setStemsBg(['scene', 'video'].includes(settings.stemsBg) ? settings.stemsBg : 'photo');
@@ -3037,6 +3058,8 @@ void main() {
     const rows = $('#stemsTexts').children, i = stems.texts.findIndex(x => !x.s);
     if (rows[i]) rows[i].lastChild.focus();
   });
+  $('#stemsSplit').checked = !!settings.stemsSplit;
+  $('#stemsSplit').addEventListener('change', e => { settings.stemsSplit = e.target.checked; save(); });
   $('#stemsZoom').checked = settings.stemsZoom !== false;
   $('#stemsZoom').addEventListener('change', e => { settings.stemsZoom = e.target.checked; save(); });
   if (params.has('pistas')) setReel(true, 'stems');
