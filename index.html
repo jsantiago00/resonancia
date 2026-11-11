@@ -65,19 +65,32 @@
     border-radius: 6px; box-shadow: 0 0 0 1px var(--line); z-index: 1; }
   body.reel #rec { display: block; }
   body.reel #c, body.reel .santi-layer { opacity: 0; pointer-events: none; }
-  #reel { position: fixed; top: 16px; left: 16px; z-index: 5; width: min(300px, calc(100% - 32px)); display: none;
+  .panel { position: fixed; top: 16px; left: 16px; z-index: 5; width: min(300px, calc(100% - 32px)); display: none;
     background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
     border: 1px solid var(--line); border-radius: 16px; padding: 16px; font-size: 13px; }
-  body.reel #reel { display: grid; gap: 10px; }
-  body.recording #reel, body.recording #bar { display: none; }
-  #reel h2 { margin: 0; font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-  #reel h2 button { padding: 2px 9px; font-size: 15px; }
-  #reel label.row { display: grid; gap: 4px; color: var(--muted); }
-  #reel input[type=text], #reel select { font: inherit; color: var(--text); background: rgba(255,255,255,.06);
+  body.reel #reel, body.stems #stems { display: grid; gap: 10px; }
+  body.stems #reel, body.recording #reel, body.recording #stems, body.recording #bar { display: none; }
+  .panel { max-height: calc(100% - 32px); overflow-y: auto; }
+  .panel textarea { font: inherit; font-size: 12px; color: var(--text); background: rgba(255,255,255,.06);
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; resize: vertical; min-height: 64px; }
+  .panel .chk { display: flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; }
+  .panel .chk input { accent-color: var(--accent); }
+  .panel .play { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+  .panel .play button { padding: 5px 11px; }
+  .panel .play input[type=range] { flex: 1; min-width: 0; }
+  #stemsList { display: grid; gap: 6px; }
+  #stemsList:empty { display: none; }
+  .trk { display: flex; gap: 6px; align-items: center; }
+  .trk input[type=color] { width: 30px; height: 30px; padding: 0; border: none; background: none; cursor: pointer; flex: none; }
+  .trk input[type=text] { flex: 1; min-width: 0; padding: 6px 9px; }
+  .panel h2 { margin: 0; font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+  .panel h2 button { padding: 2px 9px; font-size: 15px; }
+  .panel label.row { display: grid; gap: 4px; color: var(--muted); }
+  .panel input[type=text], .panel select { font: inherit; color: var(--text); background: rgba(255,255,255,.06);
     border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
-  #reel select option { background: #15151b; }
-  #reel label.file { padding: 8px 10px; font-size: 13px; border-radius: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #reel .note { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 0; }
+  .panel select option { background: #15151b; }
+  .panel label.file { padding: 8px 10px; font-size: 13px; border-radius: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .panel .note { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 0; }
   #recPill { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 5; display: none;
     align-items: center; gap: 10px; background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
     border: 1px solid var(--line); border-radius: 999px; padding: 6px 6px 6px 14px; font-size: 13px; }
@@ -153,13 +166,27 @@
   <button id="ai" title="IA de ánimo (Essentia): descarga ~13 MB la primera vez">🧠</button>
   <button id="rot" title="Girar">⟳</button>
   <button id="reelBtn" title="Reel para Instagram (video 9:16)">🎬</button>
+  <button id="stemsBtn" title="Pistas: foto + forma de onda de cada pista (video 9:16)">📷</button>
   <button id="fs" title="Pantalla completa">⛶</button>
   <span id="status">sin audio</span>
   <span id="moodTag" title="Ánimo detectado en la música" style="font-size:12px;color:var(--muted)"></span>
 </div>
 <canvas id="rec" width="1080" height="1920"></canvas>
-<div id="reel">
-  <h2>Reel 9:16 <button id="reelClose" title="Salir del modo reel">✕</button></h2>
+<div id="stems" class="panel">
+  <h2>Pistas 9:16 <button id="stemsClose" title="Salir del modo pistas">✕</button></h2>
+  <label class="file" id="stemsPhotoLbl">📷 Elegir la foto…<input type="file" accept="image/*" id="stemsPhoto"></label>
+  <label class="file" id="stemsFilesLbl">🎚 Elegir las pistas…<input type="file" accept="audio/*" multiple id="stemsFiles"></label>
+  <div id="stemsList"></div>
+  <label class="row">Textos (uno por línea, con su tiempo)
+    <textarea id="stemsText" rows="4" placeholder="0:22 bueno, antes de que te aburras"></textarea>
+  </label>
+  <label class="chk"><input type="checkbox" id="stemsZoom"> Zoom lento en la foto</label>
+  <div class="play"><button id="stemsPlay" title="Escuchar / pausar" disabled>▶</button><input type="range" id="stemsSeek" min="0" max="1" step="0.001" value="0"><span id="stemsClock">0:00</span></div>
+  <button class="primary" id="stemsGo" disabled>⏺ Grabar video</button>
+  <p class="note">Exportá las pistas desde Ableton con «All Individual Tracks» (todas del mismo largo). Graba el tema entero y descarga el video. No cambies de pestaña mientras graba.</p>
+</div>
+<div id="reel" class="panel">
+  <h2>Reel 9:16<button id="reelClose" title="Salir del modo reel">✕</button></h2>
   <label class="file" id="reelFileLbl">🎵 Elegir la canción…<input type="file" accept="audio/*" id="reelFile"></label>
   <label class="row">Título<input type="text" id="reelTitle" placeholder="Nombre del tema" maxlength="60"></label>
   <label class="row">Artista<input type="text" id="reelArtist" placeholder="Tu nombre" maxlength="60"></label>
@@ -804,7 +831,7 @@ void main() {
 
   let dpr = 1;
   // Modo reel: la escena se dibuja como si fuera una pantalla vertical de 540×960 a densidad 2 (= 1080×1920)
-  const reel = { on: false, file: null, rec: null, recording: false, t0: 0, ending: 0, audio: null, dest: null, hiddenWhileRec: false };
+  const reel = { on: false, kind: 'reel', file: null, rec: null, recording: false, t0: 0, ending: 0, audio: null, dest: null, hiddenWhileRec: false };
   const viewW = () => reel.on ? 540 : innerWidth, viewH = () => reel.on ? 960 : innerHeight;
   // Calidad automática: baja o sube la resolución para mantener la fluidez (~60 fps)
   let autoScale = isMobile ? 0.55 : 0.75, perfAcc = 0, perfFrames = 0, perfGood = 0;
@@ -1634,10 +1661,10 @@ void main() {
     return 'rgb(' + pa.map((v, i) => Math.round(v + (pb[i] - v) * k)).join(',') + ')';
   };
   const rgbOf = c => 'rgb(' + c.map(v => Math.round(Math.min(1, v) * 255)).join(',') + ')';
-  function rr(x, y, w, h, r) {
-    g2.beginPath();
-    g2.moveTo(x + r, y); g2.arcTo(x + w, y, x + w, y + h, r); g2.arcTo(x + w, y + h, x, y + h, r);
-    g2.arcTo(x, y + h, x, y, r); g2.arcTo(x, y, x + w, y, r); g2.closePath();
+  function rr(x, y, w, h, r, g = g2) {
+    g.beginPath();
+    g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
   }
 
   function updateSanti(dt, t) {
@@ -1962,7 +1989,9 @@ void main() {
         + (ESS.ready && ESS.agg !== null ? ' · 🧠' : settings.ai && ESS.worker && !ESS.ready ? ' · 🧠 cargando…' : '');
     }
 
-    if (settings.mode === 'sphere') {
+    if (reel.on && reel.kind === 'stems') {
+      // el modo pistas no usa la escena: dibuja todo en composeStems
+    } else if (settings.mode === 'sphere') {
       const M = mood;
       if (settings.rotate && !dragging) yaw += dt * 0.12 * (0.5 * M.chill + M.bailable + 1.8 * M.agresivo);
       gl.disable(gl.BLEND);
@@ -2023,7 +2052,7 @@ void main() {
       gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
       gl.drawArrays(gl.POINTS, 0, NP);
     }
-    if (reel.on) composeReel(t);
+    if (reel.on) reel.kind === 'stems' ? composeStems() : composeReel(t);
     if (debug) { const e = $('#err'); e.style.display = 'block'; e.textContent = `t=${t.toFixed(1)} lvl=${level.toFixed(3)} bass=${bass.toFixed(3)} mid=${mid.toFixed(3)} drive=${drive.toFixed(3)} locura=${hype.toFixed(2)} | A=${mood.agresivo.toFixed(2)} C=${mood.chill.toFixed(2)} B=${mood.bailable.toFixed(2)}`; }
     requestAnimationFrame(frame);
   }
@@ -2200,30 +2229,42 @@ void main() {
       rg.restore();
     }
 
-    // Fundido desde negro al empezar y a negro al terminar
+    recOverlay(now, reel.audio ? reel.audio.currentTime : 0, reel.audio ? reel.audio.duration : NaN);
+  }
+
+  // Fundido desde negro al empezar y a negro al terminar, y reloj de la grabación
+  function recOverlay(now, cur, dur) {
     if (reel.recording) {
       let v = smooth((now - reel.t0) / 900);
       if (reel.ending) v *= 1 - smooth((now - reel.ending) / 1400);
       if (v < 1) { rg.globalAlpha = 1 - v; rg.fillStyle = '#000'; rg.fillRect(0, 0, RW, RH); rg.globalAlpha = 1; }
-      const sec = Math.floor(reel.audio ? reel.audio.currentTime : 0);
+      const sec = Math.floor(cur);
       if (sec !== lastShownSec) {
         lastShownSec = sec;
-        const total = reel.audio && isFinite(reel.audio.duration) ? ' / ' + fmt(reel.audio.duration) : '';
+        const total = isFinite(dur) ? ' / ' + fmt(dur) : '';
         $('#recTime').textContent = fmt(sec) + total;
       }
     }
   }
 
-  function setReel(on) {
+  function setReel(on, kind) {
     if (reel.recording) return;
-    reel.on = on;
+    stopStems();
+    reel.on = on; reel.kind = on && kind === 'stems' ? 'stems' : 'reel';
     document.body.classList.toggle('reel', on);
-    if (on && source === 'none') startDemo();
+    document.body.classList.toggle('stems', on && reel.kind === 'stems');
+    if (on && reel.kind === 'stems') started();
+    else if (on && source === 'none') startDemo();
+  }
+
+  function canRecord() {
+    if (window.MediaRecorder && recC.captureStream) return true;
+    showErr('Este navegador no puede grabar video. Probá con Chrome o Edge en la compu.');
+    return false;
   }
 
   async function startReel() {
-    if (!reel.file || reel.recording) return;
-    if (!window.MediaRecorder || !recC.captureStream) { showErr('Este navegador no puede grabar video. Probá con Chrome o Edge en la compu.'); return; }
+    if (!reel.file || reel.recording || !canRecord()) return;
     stopCurrent(); ensureCtx();
     const audio = new Audio(URL.createObjectURL(reel.file));
     const node = actx.createMediaElementSource(audio);
@@ -2234,6 +2275,14 @@ void main() {
     source = 'analyser'; started(true); tapEssentia();
     await new Promise(r => audio.readyState >= 1 ? r() : audio.addEventListener('loadedmetadata', r, { once: true }));
 
+    recordCanvas(dest, () => $('#reelTitle').value.trim() || reel.file.name.replace(/\.[^.]+$/, ''), () => audio.pause());
+    reel.audio = audio;
+    audio.addEventListener('ended', endReel, { once: true });
+    setTimeout(() => { if (reel.recording && !reel.ending) audio.play().catch(e => { showErr(e.message); endReel(); }); }, 350);
+  }
+
+  // Grabador compartido por los modos reel y pistas: graba el canvas #rec con el audio de `dest` y descarga el video
+  function recordCanvas(dest, baseName, stopAudio) {
     const stream = new MediaStream([...recC.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
     const types = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
     const mime = types.find(t => MediaRecorder.isTypeSupported(t)) || '';
@@ -2243,7 +2292,7 @@ void main() {
     rec.onstop = () => {
       const type = rec.mimeType || mime || 'video/webm';
       const ext = type.includes('mp4') ? 'mp4' : 'webm';
-      const base = ($('#reelTitle').value.trim() || reel.file.name.replace(/\.[^.]+$/, '')).replace(/[\\/:*?"<>|]+/g, '').slice(0, 60) || 'reel';
+      const base = baseName().replace(/[\\/:*?"<>|]+/g, '').slice(0, 60) || 'reel';
       const url = URL.createObjectURL(new Blob(chunks, { type }));
       const link = document.createElement('a');
       link.href = url; link.download = `${base} (reel).${ext}`;
@@ -2252,26 +2301,24 @@ void main() {
       stream.getTracks().forEach(t => t.stop());
       dest.disconnect();
       stopCurrent(); source = 'none';
-      reel.recording = false; reel.rec = null; reel.audio = null;
+      reel.recording = false; reel.rec = null; reel.audio = null; reel.stopAudio = null;
       document.body.classList.remove('recording');
       setStatus('✅ video descargado');
       if (reel.hiddenWhileRec) showErr('Cambiaste de pestaña mientras grababa: puede haber partes trabadas. Conviene grabarlo de nuevo sin salir de la pestaña.');
       else if (ext === 'webm') showErr('Se guardó en .webm porque este navegador no graba .mp4. Clipchamp lo abre y lo exporta en .mp4 para Instagram.');
     };
 
-    Object.assign(reel, { rec, audio, recording: true, t0: performance.now(), ending: 0, hiddenWhileRec: false });
+    Object.assign(reel, { rec, stopAudio, recording: true, t0: performance.now(), ending: 0, hiddenWhileRec: false });
     lastShownSec = -1;
     document.body.classList.add('recording');
     setStatus('🎬 grabando');
     rec.start(1000);
-    audio.addEventListener('ended', endReel, { once: true });
-    setTimeout(() => { if (reel.recording && !reel.ending) audio.play().catch(e => { showErr(e.message); endReel(); }); }, 350);
   }
 
   function endReel() {
     if (!reel.recording || reel.ending) return;
     reel.ending = performance.now();
-    if (reel.audio && !reel.audio.ended) reel.audio.pause();
+    if (reel.stopAudio) reel.stopAudio();
     const rec = reel.rec;
     setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 1600);   // deja la cola en silencio con el fundido
   }
@@ -2294,6 +2341,317 @@ void main() {
   $('#reelArtist').addEventListener('input', e => { settings.reelArtist = e.target.value; save(); });
   $('#reelText').value = settings.reelText || 'intro';
   $('#reelText').addEventListener('change', e => { settings.reelText = e.target.value; save(); });
+
+  // ---------- Modo pistas: una foto y la forma de onda de cada pista, con el grabador del modo reel ----------
+  // Reemplaza grabar la pantalla de Ableton. Las pistas (exportadas con "All Individual Tracks", alineadas y
+  // del mismo largo) se mezclan en un solo buffer para que suenen perfectamente sincronizadas, y de cada una
+  // se guarda sólo su envolvente: BAR_RATE barras por segundo, de BAR_PX píxeles de ancho.
+  const STEM_COLORS = ['#ff7a8a', '#ffb454', '#ffe066', '#7be08a', '#5ad6d6', '#6aa8ff', '#b08cff', '#ff8ad8'];
+  const BAR_RATE = 25, BAR_PX = 5;
+  const stems = { tracks: [], mix: null, gain: 1, dur: 0, name: 'pistas', texts: [], photo: null, bg: null, frost: null,
+    node: null, out: null, playing: false, at: 0, t: 0, loading: false, shownSec: -1 };
+  const seek = $('#stemsSeek');
+  const stemsTime = () => stems.playing ? Math.min(stems.dur, Math.max(0, actx.currentTime - stems.at)) : stems.t;
+  const hexRgb = h => h.match(/\w\w/g).map(v => parseInt(v, 16));
+  function setStemColor(tr, hex) {
+    tr.color = hex; tr.tint = hexRgb(hex).join(',');
+    tr.light = hexRgb(hex).map(v => Math.round(v + (255 - v) * 0.72)).join(',');   // la onda va en un tono claro
+  }
+
+  // Tramos en los que la pista suena (los silencios de menos de 3 s no la hacen desaparecer)
+  function activeSpans(peaks, max) {
+    const thr = Math.max(0.003, max * 0.02), spans = [];
+    for (let j = 0; j < peaks.length; j++) {
+      if (peaks[j] <= thr) continue;
+      const t = j / BAR_RATE, last = spans[spans.length - 1];
+      if (last && t - last[1] < 3) last[1] = t + 1 / BAR_RATE; else spans.push([t, t + 1 / BAR_RATE]);
+    }
+    return spans;
+  }
+  // Presencia 0..1: entra un poco antes de sonar (la onda viene llegando) y se va cuando se calla
+  function visOf(tr, t) {
+    let v = 0;
+    for (const s of tr.spans) v = Math.max(v, smooth((t - s[0] + 1.2) / 0.6) * (1 - smooth((t - s[1] - 0.4) / 0.7)));
+    return v;
+  }
+
+  async function loadStems(files) {
+    if (!files.length || stems.loading || reel.recording) return;
+    stopStems(); ensureCtx();
+    Object.assign(stems, { loading: true, tracks: [], mix: null, t: 0 });
+    paintStems();
+    const lbl = $('#stemsFilesLbl').firstChild;
+    files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    // Ableton exporta "Proyecto Pista.wav": el prefijo común es el nombre del proyecto y el resto, el de la pista
+    const names = files.map(f => f.name.replace(/\.[^.]+$/, ''));
+    let pre = names.length > 1 ? names[0] : '';
+    for (const n of names) while (!n.startsWith(pre)) pre = pre.slice(0, -1);
+    pre = pre.replace(/[^\s_-]*$/, '');
+    stems.name = pre.replace(/[\s_-]+$/, '') || (names.length === 1 ? names[0] : 'pistas');
+    let mix = null, L = null, R = null;
+    for (let i = 0; i < files.length; i++) {
+      lbl.textContent = `⏳ Analizando ${i + 1} de ${files.length}…`;
+      let buf;
+      try { buf = await actx.decodeAudioData(await files[i].arrayBuffer()); }
+      catch (e) { showErr('No se pudo leer ' + files[i].name); continue; }
+      if (!mix || buf.length > mix.length) {
+        const m = actx.createBuffer(2, buf.length, actx.sampleRate);
+        if (mix) { m.getChannelData(0).set(L); m.getChannelData(1).set(R); }
+        mix = m; L = mix.getChannelData(0); R = mix.getChannelData(1);
+      }
+      const a = buf.getChannelData(0), b = buf.numberOfChannels > 1 ? buf.getChannelData(1) : a;
+      const step = buf.sampleRate / BAR_RATE, peaks = new Float32Array(Math.ceil(buf.length / step));
+      let max = 0;
+      for (let k = 0; k < buf.length; k++) {
+        L[k] += a[k]; R[k] += b[k];
+        const v = Math.max(Math.abs(a[k]), Math.abs(b[k])), j = (k / step) | 0;
+        if (v > peaks[j]) { peaks[j] = v; if (v > max) max = v; }
+      }
+      const spans = activeSpans(peaks, max);
+      if (!spans.length) continue;                                   // pista vacía
+      for (let j = 0; j < peaks.length; j++) peaks[j] = Math.pow(peaks[j] / max, 0.8);
+      const tr = { name: names[i].slice(pre.length).trim() || names[i], peaks, spans };
+      setStemColor(tr, STEM_COLORS[stems.tracks.length % STEM_COLORS.length]);
+      stems.tracks.push(tr);
+    }
+    stems.loading = false;
+    if (stems.tracks.length) {
+      // Si la suma de las pistas pasa de 0 dB, se baja lo justo para que no sature
+      let pk = 0;
+      for (let k = 0; k < L.length; k++) { const v = Math.max(Math.abs(L[k]), Math.abs(R[k])); if (v > pk) pk = v; }
+      Object.assign(stems, { mix, gain: pk > 0.98 ? 0.98 / pk : 1, dur: mix.duration });
+      lbl.textContent = `🎚 ${stems.tracks.length} ${stems.tracks.length === 1 ? 'pista' : 'pistas'} · ${fmt(stems.dur)}`;
+    } else lbl.textContent = '🎚 Elegir las pistas…';
+    paintStems();
+  }
+
+  function paintStems() {
+    const box = $('#stemsList');
+    box.textContent = '';
+    for (const tr of stems.tracks) {
+      const row = document.createElement('div');
+      row.className = 'trk';
+      const col = Object.assign(document.createElement('input'), { type: 'color', value: tr.color, title: 'Color de la pista' });
+      const name = Object.assign(document.createElement('input'), { type: 'text', value: tr.name, maxLength: 40, title: 'Nombre de la pista' });
+      col.addEventListener('input', () => setStemColor(tr, col.value));
+      name.addEventListener('input', () => { tr.name = name.value; });
+      row.append(col, name);
+      box.appendChild(row);
+    }
+    $('#stemsGo').disabled = $('#stemsPlay').disabled = !stems.mix;
+    $('#stemsPlay').textContent = stems.playing ? '⏸' : '▶';
+  }
+
+  function loadStemsPhoto(file) {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      stems.photo = img; stems.bg = null;
+      $('#stemsPhotoLbl').firstChild.textContent = '📷 ' + file.name.replace(/\.[^.]+$/, '');
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); showErr('No se pudo abrir la foto.'); };
+    img.src = url;
+  }
+
+  // Fondo ya armado: la foto a todo el ancho sobre un relleno desenfocado de sí misma, y una copia
+  // desenfocada de todo (el "vidrio esmerilado" de las bandas). Va un 10 % más grande que el cuadro
+  // para que el zoom lento no pierda nitidez.
+  function buildStemsBg() {
+    const W = 1188, H = 2112, img = stems.photo;
+    const mk = (w, h) => Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const bg = stems.bg = mk(W, H), g = bg.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    if (img) {
+      const iw = img.naturalWidth, ih = img.naturalHeight;
+      const fill = mk(148, 264), fg = fill.getContext('2d'), s = Math.max(148 / iw, 264 / ih) * 1.2;
+      fg.filter = 'blur(5px)';
+      fg.drawImage(img, (148 - iw * s) / 2, (264 - ih * s) / 2, iw * s, ih * s);
+      g.drawImage(fill, 0, 0, W, H);
+      g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, 0, W, H);
+      const ph = W * ih / iw;
+      g.shadowColor = 'rgba(0,0,0,.55)'; g.shadowBlur = 70;
+      g.drawImage(img, 0, (H - ph) / 2, W, ph);
+      g.shadowColor = 'transparent';
+    } else {
+      const gr = g.createLinearGradient(0, 0, W, H);
+      gr.addColorStop(0, '#23233a'); gr.addColorStop(1, '#0b0b12');
+      g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    }
+    const fr = stems.frost = mk(198, 352), fc = fr.getContext('2d');
+    fc.filter = 'blur(5px)';
+    fc.drawImage(bg, -8, -8, 214, 368);
+  }
+
+  function parseStemTexts(src) {
+    const out = [];
+    for (const line of src.split('\n')) {
+      const m = line.match(/^\s*(?:(\d+):)?(\d+)(?:[.,](\d+))?\s+(\S.*)$/);
+      if (m) out.push({ t: (+m[1] || 0) * 60 + +m[2] + +('0.' + (m[3] || 0)), s: m[4].trim(), lines: null });
+    }
+    out.sort((a, b) => a.t - b.t);
+    // cada texto dura según su largo, pero se va antes de que entre el siguiente
+    out.forEach((x, i) => { x.end = Math.max(x.t + 0.6, Math.min(x.t + 2 + x.s.length * 0.07, i + 1 < out.length ? out[i + 1].t - 0.5 : Infinity)); });
+    return out;
+  }
+
+  function drawBand(tr, t, x, y, W, H, v) {
+    const c = RW / 2, pos = t * BAR_RATE, mid = y + H / 2, amp = H - 20, pk = tr.peaks;
+    const j0 = Math.max(0, Math.floor(pos - (c - x) / BAR_PX)), j1 = Math.min(pk.length - 1, Math.ceil(pos + (x + W - c) / BAR_PX));
+    const off = Math.round(c - pos * BAR_PX), k = Math.min(pk.length - 1, Math.floor(pos));
+    const env = k >= 0 && t < stems.dur ? pk[k] : 0;
+    const bars = (a, b) => {
+      rg.beginPath();
+      for (let j = a; j <= b; j++) { const h = Math.max(2, pk[j] * amp); rg.rect(off + j * BAR_PX, mid - h / 2, 3, h); }
+    };
+    rg.save();
+    rg.globalAlpha = smooth((v - 0.45) / 0.55);                    // primero se abre el lugar y después aparece la banda
+    rr(x, y, W, H, Math.min(26, H / 2), rg);
+    rg.save();
+    rg.clip();
+    // vidrio esmerilado: el mismo fondo, desenfocado, con un velo claro y un toque del color de la pista
+    rg.drawImage(stems.frost, stems.bx, stems.by, stems.bw, stems.bh);
+    rg.fillStyle = 'rgba(255,255,255,.1)'; rg.fillRect(x, y, W, H);
+    rg.fillStyle = `rgba(${tr.tint},.16)`; rg.fillRect(x, y, W, H);
+    // la onda viene desde la derecha, brilla al pasar por el cursor (centro) y se apaga hacia la izquierda
+    const gr = rg.createLinearGradient(40, 0, RW - 40, 0);
+    for (const [p, a] of [[0, 0.05], [0.25, 0.16], [0.42, 0.34], [0.5, 1], [0.504, 0.6], [0.9, 0.6], [1, 0]]) gr.addColorStop(p, `rgba(${tr.light},${a})`);
+    rg.fillStyle = gr;
+    bars(j0, j1);
+    rg.fill();
+    if (env > 0.02 && k >= j0) {
+      const gl = rg.createLinearGradient(c - 70, 0, c, 0);
+      gl.addColorStop(0, `rgba(${tr.light},0)`); gl.addColorStop(1, `rgba(${tr.light},${env})`);
+      rg.fillStyle = gl; rg.shadowColor = tr.color; rg.shadowBlur = 26;
+      bars(Math.max(j0, k - 13), k);
+      rg.fill();
+    }
+    rg.restore();
+    rr(x, y, W, H, Math.min(26, H / 2), rg);
+    rg.strokeStyle = 'rgba(255,255,255,.28)'; rg.lineWidth = 2; rg.stroke();
+    // nombre de la pista, con un punto de su color que late con su volumen
+    const fs = H < 70 ? 20 : 24;
+    rg.shadowColor = tr.color; rg.shadowBlur = 6 + 22 * env;
+    rg.fillStyle = tr.color;
+    rg.beginPath(); rg.arc(x + 26, y + 12 + fs / 2, 5 + 3 * env, 0, 7); rg.fill();
+    rg.shadowColor = 'rgba(0,0,0,.6)'; rg.shadowBlur = 8;
+    rg.font = `600 ${fs}px "Segoe UI", system-ui, -apple-system, sans-serif`;
+    rg.textAlign = 'left'; rg.textBaseline = 'middle';
+    rg.fillStyle = 'rgba(255,255,255,.95)';
+    rg.fillText(tr.name, x + 42, y + 13 + fs / 2, W / 2 - 80);
+    rg.restore();
+  }
+
+  function composeStems() {
+    const now = performance.now(), t = stemsTime(), n = stems.tracks.length;
+    if (!stems.bg) buildStemsBg();
+    rg.globalAlpha = 1;
+    rg.imageSmoothingEnabled = true; rg.imageSmoothingQuality = 'high';
+    const z = 1 + (settings.stemsZoom !== false && stems.dur ? 0.08 * Math.min(1, t / stems.dur) : 0);
+    stems.bw = RW * z; stems.bh = RH * z; stems.bx = (RW - stems.bw) / 2; stems.by = (RH - stems.bh) / 2;
+    rg.drawImage(stems.bg, stems.bx, stems.by, stems.bw, stems.bh);
+    const tg = rg.createLinearGradient(0, 0, 0, 640);
+    tg.addColorStop(0, 'rgba(0,0,0,.45)'); tg.addColorStop(1, 'rgba(0,0,0,0)');
+    rg.fillStyle = tg; rg.fillRect(0, 0, RW, 640);
+
+    // Bandas: se apilan desde abajo (por encima de la zona que tapa Instagram); cada una ocupa lugar según su presencia
+    const X = 40, W = RW - 2 * X, GAP = 14, BOTTOM = 1500;
+    const H = Math.max(48, Math.min(120, (980 - GAP * (n - 1)) / n));
+    let y = BOTTOM, seen = 0;
+    for (let i = n - 1; i >= 0; i--) {
+      const tr = stems.tracks[i], v = visOf(tr, t);
+      if (v < 0.004) continue;
+      y -= (H + GAP) * v;
+      seen = Math.max(seen, v);
+      drawBand(tr, t, X + (1 - v) * 90, y, W, H, v);
+    }
+    if (seen > 0) {                                                // cursor fijo en el centro
+      rg.save();
+      rg.globalAlpha = seen;
+      rg.shadowColor = '#fff'; rg.shadowBlur = 14;
+      rg.fillStyle = 'rgba(255,255,255,.92)';
+      rg.fillRect(RW / 2 - 1, y - 10, 2, BOTTOM - GAP - y + 20);
+      rg.restore();
+    }
+
+    // Textos: arriba y centrados, fuera de la zona que tapa Instagram
+    for (const x of stems.texts) {
+      const a = smooth((t - x.t) / 0.35) * (1 - smooth((t - x.end) / 0.45));
+      if (a < 0.01) continue;
+      rg.save();
+      rg.font = '700 58px "Segoe UI", system-ui, -apple-system, sans-serif';
+      if (!x.lines) {
+        x.lines = [];
+        let cur = '';
+        for (const w of x.s.split(/\s+/)) {
+          const nx = cur ? cur + ' ' + w : w;
+          if (cur && rg.measureText(nx).width > RW - 168) { x.lines.push(cur); cur = w; } else cur = nx;
+        }
+        x.lines.push(cur);
+      }
+      rg.globalAlpha = a;
+      rg.textAlign = 'center'; rg.textBaseline = 'alphabetic';
+      rg.shadowColor = 'rgba(0,0,0,.7)'; rg.shadowBlur = 26;
+      rg.fillStyle = '#fff';
+      x.lines.forEach((l, i) => rg.fillText(l, RW / 2, 300 + i * 74 + 14 * (1 - a), RW - 120));
+      rg.restore();
+    }
+
+    const sec = Math.floor(t);
+    if (stems.playing) seek.value = t / stems.dur;
+    if (sec !== stems.shownSec) { stems.shownSec = sec; $('#stemsClock').textContent = fmt(sec); }
+    recOverlay(now, t, stems.dur);
+  }
+
+  // Reproduce la mezcla desde `from`; con `dest` además la manda al grabador
+  function playStems(from, dest) {
+    stopCurrent(); source = 'none'; ensureCtx();
+    const node = actx.createBufferSource(), out = actx.createGain();
+    node.buffer = stems.mix; out.gain.value = stems.gain;
+    node.connect(out); out.connect(actx.destination);
+    if (dest) out.connect(dest);
+    const lead = dest ? 0.35 : 0.05;
+    stems.at = actx.currentTime + lead - from;
+    node.start(actx.currentTime + lead, from);
+    node.onended = () => { if (reel.recording) endReel(); else { stopStems(); stems.t = 0; seek.value = 0; } };
+    Object.assign(stems, { node, out, playing: true });
+    current = { stop: stopStems };
+    paintStems(); keepAwake();
+  }
+  function stopStems() {
+    if (!stems.node) return;
+    stems.t = stemsTime();
+    const { node, out } = stems;
+    Object.assign(stems, { node: null, out: null, playing: false });
+    node.onended = null;
+    try { node.stop(); } catch {}
+    node.disconnect(); out.disconnect();
+    paintStems();
+  }
+  function recordStems() {
+    if (!stems.mix || reel.recording || !canRecord()) return;
+    ensureCtx();
+    const dest = actx.createMediaStreamDestination();
+    playStems(0, dest);
+    recordCanvas(dest, () => stems.name, stopStems);
+  }
+
+  $('#stemsBtn').addEventListener('click', () => setReel(true, 'stems'));
+  $('#stemsClose').addEventListener('click', () => setReel(false));
+  $('#stemsGo').addEventListener('click', recordStems);
+  $('#stemsPlay').addEventListener('click', () => { if (stems.playing) stopStems(); else if (stems.mix) playStems(stems.t >= stems.dur - 0.05 ? 0 : stems.t); });
+  seek.addEventListener('input', () => {
+    if (!stems.mix) return;
+    const to = seek.value * stems.dur;
+    if (stems.playing) playStems(Math.min(to, stems.dur - 0.05)); else stems.t = to;
+  });
+  $('#stemsPhoto').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadStemsPhoto(f); });
+  $('#stemsFiles').addEventListener('change', e => { const fs = [...e.target.files]; e.target.value = ''; loadStems(fs); });
+  $('#stemsText').value = settings.stemsText || '';
+  stems.texts = parseStemTexts($('#stemsText').value);
+  $('#stemsText').addEventListener('input', e => { settings.stemsText = e.target.value; stems.texts = parseStemTexts(e.target.value); save(); });
+  $('#stemsZoom').checked = settings.stemsZoom !== false;
+  $('#stemsZoom').addEventListener('change', e => { settings.stemsZoom = e.target.checked; save(); });
+  if (params.has('pistas')) setReel(true, 'stems');
 
   const toggleFs = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
   $('#fs').addEventListener('click', toggleFs);

@@ -32,6 +32,13 @@ La app detecta si lo que suena es **🔥 agresivo**, **🌙 chill** o **💃 bai
 - 🎵 Un archivo de audio.
 - ✨ Demo sin audio.
 
+## Videos para Instagram (9:16)
+
+Graban el tema entero a 1080×1920 y descargan el video (Chrome o Edge en computadora).
+
+- **🎬 Reel**: cualquiera de los modos con una canción, con título y artista opcionales.
+- **📷 Pistas**: una foto de fondo y la forma de onda de cada pista del tema (exportadas desde Ableton con «All Individual Tracks»). Cada pista aparece cuando empieza a sonar y se va cuando se calla. Admite textos con tiempo, uno por línea: `0:22 bueno, antes de que te aburras`. Se puede abrir directo con `?pistas`.
+
 ## Como fondo de pantalla en Windows
 
 Con [Lively Wallpaper](https://www.rocksdanister.com/lively/): arrastrar `index.html` (o la carpeta, que incluye `LivelyInfo.json`) a Lively.
