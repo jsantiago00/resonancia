@@ -2841,8 +2841,12 @@ void main() {
   // ---------- Destellos: cada pista dispara un efecto según su nombre, en cada ataque ----------
   // Todo depende sólo del tiempo del tema (nada de estado), así la vista previa y el video son idénticos
   // y se puede mover la barra a cualquier lado.
-  const SPARK_KINDS = { strings: '🎸 Guitarra', voice: '🎤 Voz', bass: '〰 Bajo', drums: '🥁 Bata', choir: '✨ Coro', weird: '∞ Raro', sparks: '· Chispas', off: '🚫 Nada' };
   const plain = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const SPARK_KINDS = {
+    strings: '🎸 Guitarra', bass: '🎸 Bajo', drums: '🥁 Batería', voice: '🎤 Micrófono', keys: '🎹 Teclado',
+    choir: '🐦 Pájaros', stars: '✨ Estrellas', rings: '◯ Anillos', wave: '〰 Onda', vine: '🌿 Ramas',
+    water: '💧 Gotas', bolt: '⚡ Rayos', spiral: '🌀 Espiral', weird: '∞ Raro', sparks: '· Chispas', off: '🚫 Nada',
+  };
   function sparkAuto(name) {
     const n = plain(name);
     if (/^[umn]+$/.test(n.replace(/[^a-z]/g, ''))) return 'weird';          // "uuu", "mmm", "nnn 2", "umn"…
@@ -2850,6 +2854,11 @@ void main() {
     if (/voz|voces|vox|voice|vocal|\blead\b|canto/.test(n)) return 'voice';
     if (/bajo|bass|\bsub\b/.test(n)) return 'bass';
     if (/bata|bateria|drum|kick|bombo|snare|caja|redo|hihat|plato|perc|clap|palma|shaker|pander|cajon|\b(hh|hats?|toms?|ride|crash|oh)\b/.test(n)) return 'drums';
+    if (/piano|teclad|keys|rhodes|organ|wurli|synth|sinte/.test(n)) return 'keys';
+    if (/violin|viola|cello|chelo|orquesta|arpa|strings/.test(n)) return 'vine';
+    if (/flaut|flute|vientos|saxo|\bsax\b|trompet|bronce|brass|clarinet/.test(n)) return 'spiral';
+    if (/\bpads?\b|ambient|atmos|textura|drone/.test(n)) return 'water';
+    if (/\bfx\b|ruido|noise|riser|impact|sweep|glitch/.test(n)) return 'bolt';
     if (/acus|guit|gtr|electr|criolla|nylon|ukelele|charango|cuerda|riff|strum/.test(n)) return 'strings';
     return 'sparks';
   }
@@ -2886,8 +2895,9 @@ void main() {
     }
     return c;
   }
-  // Guitarra dibujada con trazos, acostada: la caja a la izquierda (cola en x = -440) y el mástil hacia la derecha
-  function guitarPath(g) {
+  // Guitarra (o bajo) dibujada con trazos, acostada: la caja a la izquierda (cola en x = -440) y el mástil hacia la derecha
+  function guitarPath(g, bass) {
+    const N = bass ? 640 : 430, half = x => 22 - 5 * x / N;
     g.beginPath();
     g.moveTo(-440, 0);
     g.bezierCurveTo(-440, -80, -380, -140, -300, -140); g.bezierCurveTo(-230, -140, -200, -95, -170, -95);
@@ -2895,12 +2905,30 @@ void main() {
     g.lineTo(0, 26);
     g.bezierCurveTo(0, 60, -20, 112, -70, 112); g.bezierCurveTo(-110, 112, -140, 95, -170, 95);
     g.bezierCurveTo(-200, 95, -230, 140, -300, 140); g.bezierCurveTo(-380, 140, -440, 80, -440, 0);
-    g.moveTo(-108, 0); g.arc(-150, 0, 42, 0, 2 * Math.PI);                      // boca
+    if (bass) { g.moveTo(-180, -60); g.lineTo(-150, -60); g.lineTo(-150, 60); g.lineTo(-180, 60); g.closePath(); }   // micrófono del bajo
+    else { g.moveTo(-108, 0); g.arc(-150, 0, 42, 0, 2 * Math.PI); }                                                    // boca
     g.moveTo(-322, -48); g.lineTo(-322, 48); g.moveTo(-336, -48); g.lineTo(-336, 48);   // puente
-    g.moveTo(0, -22); g.lineTo(430, -17); g.moveTo(0, 22); g.lineTo(430, 17);          // mástil
-    for (let f = 1; f <= 14; f++) { const x = 430 - 430 * (1 - Math.pow(2, -f / 12)) * 1.65; g.moveTo(x, -21 + x / 86); g.lineTo(x, 21 - x / 86); }
-    g.moveTo(430, -17); g.lineTo(540, -30); g.lineTo(548, 30); g.lineTo(430, 17);      // clavijero
-    for (let p = 0; p < 3; p++) for (const s of [-1, 1]) { const x = 455 + p * 30, y = s * (24 + p * 2); g.moveTo(x + 7, y + s * 10); g.arc(x, y + s * 10, 7, 0, 2 * Math.PI); }
+    g.moveTo(0, -22); g.lineTo(N, -17); g.moveTo(0, 22); g.lineTo(N, 17);               // mástil
+    for (let f = 1; f <= (bass ? 17 : 14); f++) { const x = N - N * (1 - Math.pow(2, -f / 12)) * 1.65; g.moveTo(x, -half(x) + 1); g.lineTo(x, half(x) - 1); }
+    g.moveTo(N, -17); g.lineTo(N + 110, -30); g.lineTo(N + 118, 30); g.lineTo(N, 17);  // clavijero
+    for (let p = 0; p < (bass ? 2 : 3); p++) for (const s of [-1, 1]) { const x = N + 25 + p * 32, y = s * (34 + p * 2); g.moveTo(x + 7, y); g.arc(x, y, 7, 0, 2 * Math.PI); }
+  }
+  // Micrófono de pie, con la cabeza (rejilla) arriba, centrada en (0, -95)
+  function micPath(g) {
+    g.beginPath();
+    g.moveTo(-55, -120); g.arc(0, -120, 55, Math.PI, 0); g.lineTo(55, -70); g.arc(0, -70, 55, 0, Math.PI); g.closePath();
+    for (const y of [-140, -118, -96, -74, -52]) { const w = 50 - Math.max(0, Math.abs(y + 95) - 25) * 0.9; g.moveTo(-w, y); g.lineTo(w, y); }
+    for (const x of [-26, 0, 26]) { const h = Math.sqrt(55 * 55 - x * x); g.moveTo(x, -120 - h + 4); g.lineTo(x, -70 + h - 4); }
+    g.moveTo(-42, -4); g.lineTo(42, -4); g.moveTo(-36, 12); g.lineTo(36, 12);                          // anillo
+    g.moveTo(-32, 12); g.lineTo(-20, 190); g.lineTo(20, 190); g.lineTo(32, 12);                         // cuerpo
+    g.moveTo(0, 190); g.bezierCurveTo(0, 260, 90, 250, 80, 340);                                         // cable
+  }
+  // Teclado de dos octavas (14 teclas blancas de 50 de ancho)
+  function keysPath(g) {
+    g.beginPath();
+    g.rect(-350, -85, 700, 170);
+    for (let k = 1; k < 14; k++) { g.moveTo(-350 + 50 * k, -85); g.lineTo(-350 + 50 * k, 85); }
+    for (let o = 0; o < 2; o++) for (const b of [1, 2, 4, 5, 6]) g.rect(-350 + 50 * (o * 7 + b) - 15, -85, 30, 100);
   }
   // Batería dibujada con trazos; cada pieza se dibuja en su lugar y `h` (0..1) es cuánto acaba de sonar
   const KIT = [
@@ -2975,102 +3003,96 @@ void main() {
   }
   const LISSA = [[1, 2], [2, 3], [3, 4], [3, 5], [1, 3], [4, 5], [5, 6]];
 
+  // Lugar de cada dibujo: cambia cada vez que la pista vuelve a entrar y deriva despacio mientras suena.
+  // `draw` (0..1) es cuánto del trazo está hecho: el dibujo se traza solo al entrar y se borra al irse.
+  function placeOf(tr, t, A, salt) {
+    let si = 0;
+    for (let i = 0; i < tr.spans.length; i++) if (tr.spans[i][0] - 1.6 <= t) si = i;
+    const s = (tr.seed + salt * 7919) >>> 0, r = q => rnd(s, si, 20 + q);
+    return {
+      x: A.x0 + A.w * r(0) + 70 * Math.sin(t * (0.1 + 0.08 * r(2)) + 6 * r(3)),
+      y: A.y0 + A.h * r(1) + 55 * Math.sin(t * (0.08 + 0.07 * r(4)) + 6 * r(5)),
+      a: (r(6) - 0.5) * 1.1 + 0.07 * Math.sin(t * 0.21 + 6 * r(7)),
+      flip: r(8) < 0.5 ? -1 : 1, s: 0.85 + 0.3 * r(9),
+      draw: Math.min(visOf(tr, t), smooth((t - tr.spans[si][0] + 1.6) / 1.9)),
+    };
+  }
+
   function drawSparks(t, split) {
     const I = settings.stemsSpark ?? 1;
     if (!(I > 0) || !stems.tracks.length) return;
-    const cy = split ? 470 : settings.stemsOnlyFx ? 860 : 560;      // centro de la zona de los destellos (sin bandas, al medio)
+    // zona de los dibujos: sin bandas, casi toda la pantalla; con mitades, la de arriba
+    const A = settings.stemsOnlyFx ? { x0: RW * 0.2, w: RW * 0.6, y0: 380, h: 1050 }
+      : split ? { x0: RW * 0.22, w: RW * 0.56, y0: 230, h: 520 } : { x0: RW * 0.2, w: RW * 0.6, y0: 330, h: 950 };
     const by = {};                                                   // pistas por tipo (todas, para que no salten de lugar)
     for (const tr of stems.tracks) { const k = kindOf(tr); if (k !== 'off') (by[k] ||= []).push([tr, visOf(tr, t)]); }
+    const trace = (L, d) => rg.setLineDash(d >= 0.999 ? [] : [L * d, 1e5]);
     rg.save();
     rg.globalCompositeOperation = 'lighter';
     rg.lineCap = 'round'; rg.lineJoin = 'round';
 
-    // 🎸 Guitarra: una guitarra dibujada con trazos por cada pista; en cada rasguido le vibran las cuerdas
-    if (by.strings) {
-      const n = by.strings.length, sc = n === 1 ? 0.95 : n === 2 ? 0.78 : 0.6;
-      by.strings.forEach(([tr, v], k) => {
-        if (v < 0.01) return;
-        const e = envOf(tr, t), flip = k % 2 ? -1 : 1, gy = cy + (k - (n - 1) / 2) * Math.min(300, 760 / n);
+    // 🎸 Guitarra / bajo: uno por pista, con trazo doble como a mano; en cada ataque le vibran las cuerdas
+    const fretted = (list, bass) => {
+      const n = list.length, base = (n === 1 ? 0.9 : n === 2 ? 0.75 : 0.6) * (bass ? 0.8 : 1);
+      const C = bass ? 4 : 6, N = bass ? 640 : 430;
+      for (const [tr, v] of list) {
+        if (v < 0.01) continue;
+        const P = placeOf(tr, t, A, bass ? 1 : 0);
+        if (P.draw < 0.01) continue;
+        const e = envOf(tr, t), sc = base * P.s, al = P.draw * I;
         rg.save();
-        rg.translate(RW / 2, gy); rg.rotate(-0.3 * flip + 0.02 * Math.sin(t * 0.4 + k)); rg.scale(sc * flip, sc);
-        // trazo doble, levemente corrido, como dibujado a mano
-        guitarPath(rg);
-        rg.strokeStyle = `rgba(${tr.light},${(0.3 + 0.5 * e) * v * I})`; rg.lineWidth = 2.5 / sc; rg.stroke();
+        rg.translate(P.x, P.y); rg.rotate(P.a * 0.8); rg.scale(sc * P.flip, sc); rg.translate(bass ? -150 : -50, 0);
+        trace(1900, P.draw);
+        guitarPath(rg, bass);
+        rg.strokeStyle = `rgba(${tr.light},${(0.3 + 0.5 * e) * al})`; rg.lineWidth = 2.5 / sc; rg.stroke();
         rg.save();
-        rg.translate(3 + 1.5 * Math.sin(t * 1.3 + k), -2); rg.rotate(0.006);
-        guitarPath(rg);
-        rg.strokeStyle = `rgba(${tr.tint},${(0.15 + 0.3 * e) * v * I})`; rg.lineWidth = 1.5 / sc; rg.stroke();
+        rg.translate(3 + 1.5 * Math.sin(t * 1.3 + tr.seed % 7), -2); rg.rotate(0.006);
+        guitarPath(rg, bass);
+        rg.strokeStyle = `rgba(${tr.tint},${(0.15 + 0.3 * e) * al})`; rg.lineWidth = 1.5 / sc; rg.stroke();
         rg.restore();
-        // cada ataque es un rasguido (todas las cuerdas, una tras otra) o una nota punteada (una cuerda)
-        const amp = [0, 0, 0, 0, 0, 0], ph = [0, 0, 0, 0, 0, 0];
+        rg.setLineDash([]);
+        // guitarra: rasguido (todas las cuerdas, una tras otra) o nota punteada; bajo: una cuerda por nota
+        const amp = new Array(C).fill(0), ph = new Array(C).fill(0);
         let last = null;
-        eachHit(tr, t, 1.8, (age, a, i) => {
-          const strum = rnd(tr.seed, i, 1) < 0.6, one = Math.floor(rnd(tr.seed, i, 2) * 6);
-          for (let s = 0; s < 6; s++) {
+        eachHit(tr, t, bass ? 2.5 : 1.8, (age, a, i) => {
+          const strum = !bass && rnd(tr.seed, i, 1) < 0.6, one = Math.floor(rnd(tr.seed, i, 2) * C);
+          for (let s = 0; s < C; s++) {
             if (!strum && s !== one) continue;
             const ag = age - (strum ? s * 0.012 : 0);
             if (ag < 0) continue;
-            const m = a * Math.exp(-ag * 2.6);
-            if (m > amp[s]) { amp[s] = m; ph[s] = ag * (46 + s * 4); }
+            const m = a * Math.exp(-ag * (bass ? 1.6 : 2.6));
+            if (m > amp[s]) { amp[s] = m; ph[s] = ag * (bass ? 22 + s * 3 : 46 + s * 4); }
           }
           last = [age, a];
         });
-        for (let s = 0; s < 6; s++) {
-          const y0 = (s - 2.5) * 13, y1 = (s - 2.5) * 10, m = amp[s] * v * I;
+        const sp0 = bass ? 16 : 13, sp1 = bass ? 12 : 10, mid = (C - 1) / 2;
+        for (let s = 0; s < C; s++) {
+          const y0 = (s - mid) * sp0, y1 = (s - mid) * sp1, m = amp[s] * al;
           rg.beginPath();
           for (let q = 0; q <= 40; q++) {
-            const u = q / 40, d = m * 16 * Math.sin(PI * u) * Math.cos(ph[s]);
-            rg.lineTo(-329 + 759 * u, y0 + (y1 - y0) * u + d);
+            const u = q / 40, d = m * (bass ? 22 : 16) * Math.sin(PI * u) * Math.cos(ph[s]);
+            rg.lineTo(-329 + (N + 329) * u, y0 + (y1 - y0) * u + d);
           }
-          rg.strokeStyle = `rgba(${tr.light},${(0.25 + 0.4 * e) * v * I})`; rg.lineWidth = (0.9 + 0.25 * s) / sc; rg.stroke();
+          rg.strokeStyle = `rgba(${tr.light},${(0.25 + 0.4 * e) * al})`; rg.lineWidth = ((bass ? 1.6 : 0.9) + 0.25 * s) / sc; rg.stroke();
           if (m > 0.01) {
             rg.strokeStyle = `rgba(${tr.tint},${0.35 * m})`; rg.lineWidth = 8 / sc; rg.stroke();
-            rg.strokeStyle = `rgba(${tr.light},${0.95 * m})`; rg.lineWidth = (1.2 + 0.3 * s) / sc; rg.stroke();
+            rg.strokeStyle = `rgba(${tr.light},${0.95 * m})`; rg.lineWidth = ((bass ? 2 : 1.2) + 0.3 * s) / sc; rg.stroke();
           }
         }
-        if (last && last[0] < 0.5) glow(tr, -150, 0, 70 + 70 * last[1], (1 - last[0] / 0.5) * last[1] * 0.8 * v * I);   // la boca se enciende
+        if (last && last[0] < 0.5) glow(tr, bass ? -165 : -150, 0, 70 + 70 * last[1], (1 - last[0] / 0.5) * last[1] * 0.8 * al);
         rg.restore();
-      });
-    }
-
-    // 🎤 Voz: cada voz tiene su lugar; un aura que respira con la voz y anillos que se abren en cada frase
-    if (by.voice) by.voice.forEach(([tr, v], k, all) => {
-      if (v < 0.01) return;
-      const x = RW * (k + 1) / (all.length + 1), y = cy - 70, e = envOf(tr, t);
-      glow(tr, x, y, 120 + 280 * e, 0.5 * e * v * I);
-      eachHit(tr, t, 2.4, (age, a) => {
-        const f = age / 2.4, r = 30 + 460 * (1 - Math.exp(-age * 1.4));
-        rg.strokeStyle = `rgba(${tr.light},${a * (1 - f) ** 2 * 0.75 * v * I})`; rg.lineWidth = 1 + 3 * (1 - f);
-        rg.beginPath(); rg.arc(x, y, r, 0, 7); rg.stroke();
-      });
-    });
-
-    // 〰 Bajo: una onda grave y lenta abajo de la zona, con un pulso de luz en cada nota
-    if (by.bass) by.bass.forEach(([tr, v], k) => {
-      if (v < 0.01) return;
-      const e = envOf(tr, t), y = cy + 330 + k * 26;
-      eachHit(tr, t, 1.2, (age, a) => {
-        rg.save(); rg.translate(RW / 2, y); rg.scale(1, 0.32);
-        glow(tr, 0, 0, 200 + 700 * (1 - Math.exp(-age * 3)), a * (1 - age / 1.2) ** 2 * 0.55 * v * I);
-        rg.restore();
-      });
-      for (let l = 0; l < 3; l++) {
-        rg.beginPath();
-        for (let q = 0; q <= 60; q++) {
-          const u = q / 60, yy = y + e * 80 * Math.sin(PI * u) * Math.sin(u * PI * 3 + t * (2 + l * 0.7) + l * 1.3);
-          q ? rg.lineTo(u * RW, yy) : rg.moveTo(0, yy);
-        }
-        rg.strokeStyle = `rgba(${l ? tr.tint : tr.light},${(0.55 - l * 0.15) * e * v * I})`; rg.lineWidth = 5 - l * 1.4;
-        rg.stroke();
       }
-    });
+    };
+    if (by.strings) fretted(by.strings, false);
+    if (by.bass) fretted(by.bass, true);
 
-    // 🥁 Bata: una batería dibujada con trazos (una sola para todas las pistas de bata). Cada golpe se reconoce
-    // (bombo, redoblante, hi-hat o platillo) y se enciende esa pieza, con su dibujito
+    // 🥁 Batería: una sola para todas las pistas de bata. Cada golpe se reconoce (bombo, redoblante,
+    // hi-hat o platillo) y se enciende esa pieza, con su dibujito
     if (by.drums) {
-      const sv = Math.max(...by.drums.map(d => d[1]));
-      if (sv > 0.01) {
-        const H = [0, 0, 0, 0], E = [null, null, null, null];
+      let D = 0;
+      for (const [tr] of by.drums) D = Math.max(D, placeOf(tr, t, A, 2).draw);
+      if (D > 0.01) {
+        const P = placeOf(by.drums[0][0], t, A, 2), H = [0, 0, 0, 0], E = [null, null, null, null];
         for (const [tr, v] of by.drums) {
           if (v < 0.01) continue;
           eachHit(tr, t, 1.5, (age, a, i) => {
@@ -3078,18 +3100,20 @@ void main() {
             if (h > H[p]) { H[p] = h; E[p] = { tr, age, a: a * v }; }
           });
         }
+        const s = (split ? 0.72 : 0.82) * P.s;
         rg.save();
-        rg.translate(RW / 2, cy - 20); rg.scale(split ? 0.8 : 0.9, split ? 0.8 : 0.9);
+        rg.translate(P.x, P.y); rg.rotate(P.a * 0.25); rg.scale(s, s); rg.translate(40, -50);
         KIT.forEach((draw, p) => {
+          trace(900, D);
           rg.beginPath(); draw(rg, H[p], t);
-          rg.strokeStyle = `rgba(255,255,255,${0.22 * sv * I})`; rg.lineWidth = 2.5; rg.stroke();
+          rg.strokeStyle = `rgba(255,255,255,${0.25 * D * I})`; rg.lineWidth = 2.5; rg.stroke();
           const ev = E[p];
           if (!ev || H[p] < 0.02) return;
           const { tr, age, a } = ev, [hx, hy] = KIT_HIT[p], al = a * I;
           rg.strokeStyle = `rgba(${tr.tint},${0.4 * H[p] * I})`; rg.lineWidth = 9; rg.stroke();
           rg.strokeStyle = `rgba(${tr.light},${H[p] * I})`; rg.lineWidth = 2.5; rg.stroke();
+          rg.setLineDash([]);
           glow(tr, hx, hy, 60 + 120 * H[p], 0.8 * H[p] * I);
-          rg.strokeStyle = `rgba(${tr.light},${al})`;
           rg.beginPath();
           if (p === 0 && age < 0.8) {                                 // bombo: una onda que sale del parche
             rg.lineWidth = 3 * (1 - age / 0.8) + 0.5; rg.strokeStyle = `rgba(${tr.light},${al * (1 - age / 0.8) ** 2})`;
@@ -3097,8 +3121,8 @@ void main() {
           } else if (p === 1 && age < 0.4) {                          // redoblante: chispazo arriba del parche
             rg.lineWidth = 2.5; rg.strokeStyle = `rgba(${tr.light},${al * (1 - age / 0.4)})`;
             for (let q = 0; q < 8; q++) {
-              const an = -PI + q / 7 * PI, r = 40 + 220 * age, c = Math.cos(an), s = Math.sin(an);
-              rg.moveTo(hx + c * r, hy + s * r * 0.8); rg.lineTo(hx + c * (r + 34 * (1 - age / 0.4)), hy + s * (r + 34 * (1 - age / 0.4)) * 0.8);
+              const an = -PI + q / 7 * PI, r = 40 + 220 * age, c = Math.cos(an), sn = Math.sin(an), l = 34 * (1 - age / 0.4);
+              rg.moveTo(hx + c * r, hy + sn * r * 0.8); rg.lineTo(hx + c * (r + l), hy + sn * (r + l) * 0.8);
             }
           } else if (p === 2 && age < 0.25) {                         // hi-hat: tres rayitas arriba
             rg.lineWidth = 2; rg.strokeStyle = `rgba(${tr.light},${al * (1 - age / 0.25)})`;
@@ -3106,10 +3130,10 @@ void main() {
           } else if (p === 3 && age < 1.5) {                          // platillo: anillos de vibración
             rg.lineWidth = 1.5;
             for (let q = 0; q < 3; q++) {
-              const ag = age - q * 0.12;
+              const ag = age - q * 0.12, R = 120 + ag * 160;
               if (ag < 0) continue;
-              rg.moveTo(hx + (120 + ag * 160) * Math.cos(-0.18), hy + (120 + ag * 160) * Math.sin(-0.18));
-              rg.ellipse(hx, hy, 120 + ag * 160, 20 + ag * 30, -0.18, 0, 2 * PI);
+              rg.moveTo(hx + R * Math.cos(-0.18), hy + R * Math.sin(-0.18));
+              rg.ellipse(hx, hy, R, 20 + ag * 30, -0.18, 0, 2 * PI);
             }
             rg.strokeStyle = `rgba(${tr.light},${al * 0.6 * (1 - age / 1.5) ** 2})`;
           }
@@ -3125,20 +3149,85 @@ void main() {
       }
     }
 
-    // ✨ Coro: un cielo de puntitos que titilan con el coro, y estrellas que florecen en cada entrada
+    // 🎤 Micrófono: se ilumina con la voz y le salen ondas en cada frase
+    if (by.voice) for (const [tr, v] of by.voice) {
+      if (v < 0.01) continue;
+      const P = placeOf(tr, t, A, 3);
+      if (P.draw < 0.01) continue;
+      const e = envOf(tr, t), al = P.draw * I, s = 0.85 * P.s;
+      rg.save();
+      rg.translate(P.x, P.y); rg.rotate(P.a * 0.7); rg.scale(s, s);
+      trace(900, P.draw);
+      micPath(rg);
+      rg.strokeStyle = `rgba(${tr.light},${(0.35 + 0.5 * e) * al})`; rg.lineWidth = 2.5 / s; rg.stroke();
+      rg.setLineDash([]);
+      glow(tr, 0, -95, 90 + 220 * e, 0.5 * e * al);
+      eachHit(tr, t, 2.4, (age, a) => {
+        const f = age / 2.4, r = 75 + 420 * (1 - Math.exp(-age * 1.4));
+        rg.strokeStyle = `rgba(${tr.light},${a * (1 - f) ** 2 * 0.8 * al})`; rg.lineWidth = (1 + 3 * (1 - f)) / s;
+        rg.beginPath(); rg.arc(0, -95, r, -PI / 2 - 0.9, -PI / 2 + 0.9); rg.stroke();
+      });
+      rg.restore();
+    }
+
+    // 🎹 Teclado: se hunde la tecla que suena y sube una notita
+    if (by.keys) for (const [tr, v] of by.keys) {
+      if (v < 0.01) continue;
+      const P = placeOf(tr, t, A, 4);
+      if (P.draw < 0.01) continue;
+      const e = envOf(tr, t), al = P.draw * I, s = 0.8 * P.s;
+      rg.save();
+      rg.translate(P.x, P.y); rg.rotate(P.a * 0.5); rg.scale(s, s);
+      trace(1600, P.draw);
+      keysPath(rg);
+      rg.strokeStyle = `rgba(${tr.light},${(0.3 + 0.4 * e) * al})`; rg.lineWidth = 2.5 / s; rg.stroke();
+      rg.setLineDash([]);
+      eachHit(tr, t, 1.8, (age, a, i) => {
+        const x = -325 + 50 * Math.floor(rnd(tr.seed, i, 15) * 14), m = a * Math.exp(-age * 4) * al;
+        if (m > 0.01) { rg.fillStyle = `rgba(${tr.light},${0.4 * m})`; rg.fillRect(x - 22, -82, 44, 164); }
+        const ny = -115 - age * 170, nx = x + 25 * Math.sin(age * 3 + i);
+        rg.strokeStyle = `rgba(${tr.light},${a * (1 - age / 1.8) * al})`; rg.lineWidth = 2.5 / s;
+        rg.beginPath(); rg.ellipse(nx, ny, 13, 9, -0.4, 0, 2 * PI);
+        rg.moveTo(nx + 12, ny - 3); rg.lineTo(nx + 12, ny - 55); rg.quadraticCurveTo(nx + 32, ny - 42, nx + 26, ny - 22);
+        rg.stroke();
+      });
+      rg.restore();
+    }
+
+    // 🐦 Pájaros: cada entrada suelta una bandadita que cruza la pantalla aleteando
     if (by.choir) for (const [tr, v] of by.choir) {
       if (v < 0.01) continue;
-      const e = envOf(tr, t);
+      eachHit(tr, t, 7, (age, a, h) => {
+        const al = a * Math.min(1, age / 0.4) * Math.min(1, (7 - age) / 1.2) * v * I;
+        if (al < 0.01) return;
+        const dir = rnd(tr.seed, h, 40) < 0.5 ? 1 : -1, nb = 1 + Math.floor(rnd(tr.seed, h, 41) * 3);
+        const y0 = A.y0 + A.h * rnd(tr.seed, h, 42), sp = (RW + 300) / (5 + 2 * rnd(tr.seed, h, 43));
+        rg.strokeStyle = `rgba(${tr.light},${al})`; rg.lineWidth = 2.2;
+        rg.beginPath();
+        for (let q = 0; q < nb; q++) {
+          const k = h * 3 + q, w = 16 + 12 * rnd(tr.seed, k, 44), ph = 6 * rnd(tr.seed, k, 45);
+          const x = (dir > 0 ? -150 : RW + 150) + dir * (sp * age - q * 55), y = y0 - 50 * age + 22 * Math.sin(age * 1.3 + ph) + q * 30 * (q % 2 ? 1 : -1);
+          const f = Math.sin(age * (8 + 3 * rnd(tr.seed, k, 46)) + ph) * w * 0.6;
+          rg.moveTo(x - w, y - f); rg.quadraticCurveTo(x - w * 0.35, y - f * 0.2 - 4, x, y); rg.quadraticCurveTo(x + w * 0.35, y - f * 0.2 - 4, x + w, y - f);
+        }
+        rg.stroke();
+      });
+    }
+
+    // ✨ Estrellas: un cielo de puntitos que titilan, y estrellas que florecen en cada entrada
+    if (by.stars) for (const [tr, v] of by.stars) {
+      if (v < 0.01) continue;
+      const P = placeOf(tr, t, A, 5), e = envOf(tr, t);
       for (let i = 0; i < 16; i++) {
         const tw = 0.5 + 0.5 * Math.sin(t * (1.5 + 2 * rnd(tr.seed, i, 6)) + i);
-        glow(tr, RW * rnd(tr.seed, i, 7), cy + (rnd(tr.seed, i, 8) - 0.5) * 760, 4 + 12 * e * tw, e * tw * 0.7 * v * I);
+        glow(tr, P.x + (rnd(tr.seed, i, 7) - 0.5) * RW * 0.9, P.y + (rnd(tr.seed, i, 8) - 0.5) * 600, 4 + 12 * e * tw, e * tw * 0.7 * v * I);
       }
       eachHit(tr, t, 2.6, (age, a, h) => {
         const b = Math.sin(PI * age / 2.6) * a, al = b * v * I;
         rg.strokeStyle = `rgba(${tr.light},${al})`; rg.lineWidth = 1.5;
         rg.beginPath();
         for (let q = 0; q < 7; q++) {
-          const x = RW * rnd(tr.seed, h * 7 + q, 9), y = cy + (rnd(tr.seed, h * 7 + q, 10) - 0.5) * 760 - age * 30, s = 6 + 24 * b;
+          const x = P.x + (rnd(tr.seed, h * 7 + q, 9) - 0.5) * RW * 0.9, y = P.y + (rnd(tr.seed, h * 7 + q, 10) - 0.5) * 600 - age * 30, s = 6 + 24 * b;
           glow(tr, x, y, s * 2, al * 0.8);
           rg.moveTo(x - s, y); rg.lineTo(x + s, y); rg.moveTo(x, y - s); rg.lineTo(x, y + s);
         }
@@ -3146,14 +3235,136 @@ void main() {
       });
     }
 
+    // ◯ Anillos: un aura que respira con la pista y anillos que se abren en cada ataque
+    if (by.rings) for (const [tr, v] of by.rings) {
+      if (v < 0.01) continue;
+      const P = placeOf(tr, t, A, 6), e = envOf(tr, t);
+      glow(tr, P.x, P.y, 120 + 280 * e, 0.5 * e * v * I);
+      eachHit(tr, t, 2.4, (age, a) => {
+        const f = age / 2.4, r = 30 + 460 * (1 - Math.exp(-age * 1.4));
+        rg.strokeStyle = `rgba(${tr.light},${a * (1 - f) ** 2 * 0.75 * v * I})`; rg.lineWidth = 1 + 3 * (1 - f);
+        rg.beginPath(); rg.arc(P.x, P.y, r, 0, 2 * PI); rg.stroke();
+      });
+    }
+
+    // 〰 Onda: una onda lenta de lado a lado, con un pulso de luz en cada nota
+    if (by.wave) for (const [tr, v] of by.wave) {
+      if (v < 0.01) continue;
+      const e = envOf(tr, t), y = placeOf(tr, t, A, 7).y;
+      eachHit(tr, t, 1.2, (age, a) => {
+        rg.save(); rg.translate(RW / 2, y); rg.scale(1, 0.32);
+        glow(tr, 0, 0, 200 + 700 * (1 - Math.exp(-age * 3)), a * (1 - age / 1.2) ** 2 * 0.55 * v * I);
+        rg.restore();
+      });
+      for (let l = 0; l < 3; l++) {
+        rg.beginPath();
+        for (let q = 0; q <= 60; q++) {
+          const u = q / 60, yy = y + e * 80 * Math.sin(PI * u) * Math.sin(u * PI * 3 + t * (2 + l * 0.7) + l * 1.3);
+          q ? rg.lineTo(u * RW, yy) : rg.moveTo(0, yy);
+        }
+        rg.strokeStyle = `rgba(${l ? tr.tint : tr.light},${(0.55 - l * 0.15) * e * v * I})`; rg.lineWidth = 5 - l * 1.4;
+        rg.stroke();
+      }
+    }
+
+    // 🌿 Ramas: en cada ataque crece una rama desde un borde y se abre en brotes
+    if (by.vine) for (const [tr, v] of by.vine) {
+      if (v < 0.01) continue;
+      eachHit(tr, t, 3.4, (age, a, h) => {
+        const al = a * Math.min(1, (3.4 - age) / 1.0) * v * I;
+        if (al < 0.01) return;
+        const side = Math.floor(rnd(tr.seed, h, 50) * 3), u = rnd(tr.seed, h, 51), tw = 0.6 * rnd(tr.seed, h, 52) - 0.3;
+        const [x, y, an] = side === 0 ? [-10, A.y0 + A.h * u, tw] : side === 1 ? [RW + 10, A.y0 + A.h * u, PI + tw] : [RW * (0.15 + 0.7 * u), A.y0 + A.h + 120, -PI / 2 + tw];
+        const p = Math.min(1, age / 1.3) * 6, tips = [];
+        rg.beginPath();
+        const branch = (x, y, an, len, d, id) => {
+          const f = Math.min(1, p - d);
+          if (f <= 0) return;
+          const x2 = x + Math.cos(an) * len * f, y2 = y + Math.sin(an) * len * f;
+          rg.moveTo(x, y); rg.lineTo(x2, y2);
+          if (f < 1) return;
+          if (d === 5) { tips.push([x2, y2]); return; }
+          const k = h * 64 + id, sp = 0.3 + 0.35 * rnd(tr.seed, k, 53), bend = (rnd(tr.seed, k, 54) - 0.5) * 0.4;
+          branch(x2, y2, an - sp + bend, len * 0.74, d + 1, id * 2 + 1);
+          branch(x2, y2, an + sp + bend, len * 0.74, d + 1, id * 2 + 2);
+        };
+        branch(x, y, an, 150 + 90 * a, 0, 0);
+        rg.strokeStyle = `rgba(${tr.light},${al * 0.85})`; rg.lineWidth = 2; rg.stroke();
+        for (const [tx, ty] of tips) glow(tr, tx, ty, 10 + 8 * a, al * 0.7);
+      });
+    }
+
+    // 💧 Gotas: cada ataque cae como una gota en el agua y abre ondas en perspectiva
+    if (by.water) for (const [tr, v] of by.water) {
+      if (v < 0.01) continue;
+      eachHit(tr, t, 2.8, (age, a, h) => {
+        const x = RW * (0.12 + 0.76 * rnd(tr.seed, h, 60)), y = A.y0 + A.h * rnd(tr.seed, h, 61);
+        rg.lineWidth = 2;
+        for (let q = 0; q < 3; q++) {
+          const ag = age - q * 0.28, f = 1 - ag / 2.8;
+          if (ag < 0) continue;
+          const rx = 15 + 280 * a * (1 - Math.exp(-ag * 1.3));
+          rg.strokeStyle = `rgba(${tr.light},${a * f * f * 0.8 * v * I})`;
+          rg.beginPath(); rg.ellipse(x, y, rx, rx * 0.3, 0, 0, 2 * PI); rg.stroke();
+        }
+        if (age < 0.5) for (let q = 0; q < 6; q++) {                  // salpicadura
+          const an = -PI / 2 + (q - 2.5) * 0.35, d = 170 * age;
+          glow(tr, x + Math.cos(an) * d, y + Math.sin(an) * d + 320 * age * age, 7, (1 - age / 0.5) * a * v * I);
+        }
+      });
+    }
+
+    // ⚡ Rayos: cada ataque es un rayo que baja zigzagueando hasta un punto
+    if (by.bolt) for (const [tr, v] of by.bolt) {
+      if (v < 0.01) continue;
+      eachHit(tr, t, 0.5, (age, a, h) => {
+        const x0 = RW * (0.15 + 0.7 * rnd(tr.seed, h, 70)), y0 = A.y0 - 220;
+        const x1 = x0 + (rnd(tr.seed, h, 71) - 0.5) * 400, y1 = A.y0 + A.h * (0.35 + 0.6 * rnd(tr.seed, h, 72));
+        let pts = [[x0, y0], [x1, y1]];
+        for (let g = 0, amp = Math.hypot(x1 - x0, y1 - y0) * 0.18; g < 5; g++, amp *= 0.55) {
+          const np = [pts[0]];
+          for (let i = 1; i < pts.length; i++) {
+            const [ax, ay] = pts[i - 1], [bx, bY] = pts[i];
+            np.push([(ax + bx) / 2 + (rnd(tr.seed, h * 97 + g * 31 + i, 73) - 0.5) * 2 * amp, (ay + bY) / 2], pts[i]);
+          }
+          pts = np;
+        }
+        const al = a * (1 - age / 0.5) * ((age * 30 | 0) % 3 === 1 ? 0.6 : 1) * v * I;
+        rg.beginPath();
+        pts.forEach(([px, py], i) => i ? rg.lineTo(px, py) : rg.moveTo(px, py));
+        const [bx, bY] = pts[Math.floor(pts.length * (0.3 + 0.3 * rnd(tr.seed, h, 74)))], dir = rnd(tr.seed, h, 75) < 0.5 ? -1 : 1;
+        rg.moveTo(bx, bY);
+        for (let q = 1; q <= 4; q++) rg.lineTo(bx + dir * q * 38 + (rnd(tr.seed, h * 5 + q, 76) - 0.5) * 30, bY + q * 42);
+        rg.strokeStyle = `rgba(${tr.tint},${0.35 * al})`; rg.lineWidth = 10; rg.stroke();
+        rg.strokeStyle = `rgba(${tr.light},${al})`; rg.lineWidth = 2.5; rg.stroke();
+        glow(tr, x1, y1, 60 + 60 * a, al * 0.8);
+      });
+    }
+
+    // 🌀 Espiral: cada ataque desenrolla una espiral, como un soplido
+    if (by.spiral) for (const [tr, v] of by.spiral) {
+      if (v < 0.01) continue;
+      eachHit(tr, t, 2.6, (age, a, h) => {
+        const x = RW * (0.15 + 0.7 * rnd(tr.seed, h, 80)), y = A.y0 + A.h * rnd(tr.seed, h, 81);
+        const dir = rnd(tr.seed, h, 82) < 0.5 ? 1 : -1, rot = rnd(tr.seed, h, 83) * 2 * PI, k = 9 + 6 * a;
+        const th = 5 * PI * Math.min(1, age / 1.1), al = a * Math.min(1, (2.6 - age) / 1.2) * v * I;
+        if (al < 0.01) return;
+        rg.beginPath();
+        for (let s = 0; s <= th; s += 0.12) { const r = 4 + k * s, an = rot + dir * s; s ? rg.lineTo(x + Math.cos(an) * r, y + Math.sin(an) * r) : rg.moveTo(x + Math.cos(an) * r, y + Math.sin(an) * r); }
+        rg.strokeStyle = `rgba(${tr.light},${al})`; rg.lineWidth = 2; rg.stroke();
+        const an = rot + dir * th;
+        glow(tr, x + Math.cos(an) * (4 + k * th), y + Math.sin(an) * (4 + k * th), 18, al);
+      });
+    }
+
     // ∞ Raro (uuu, mmm, nnn): una figura de Lissajous que gira; en cada ataque se desdobla en rojo y cian
     if (by.weird) by.weird.forEach(([tr, v], k) => {
       if (v < 0.01) return;
-      const e = envOf(tr, t), [p, q] = LISSA[tr.seed % LISSA.length], R = 160 + 190 * e + k * 16;
+      const P = placeOf(tr, t, A, 8), e = envOf(tr, t), [p, q] = LISSA[tr.seed % LISSA.length], R = (140 + 170 * e) * P.s;
       let g = 0;
       eachHit(tr, t, 0.45, (age, a) => { g = Math.max(g, a * (1 - age / 0.45)); });
       rg.save();
-      rg.translate(RW / 2, cy); rg.rotate(t * 0.15 + k * 0.9);
+      rg.translate(P.x, P.y); rg.rotate(t * 0.15 + k * 0.9);
       const path = (dx, col, al) => {
         rg.beginPath();
         for (let i = 0; i <= 240; i++) {
@@ -3172,7 +3383,7 @@ void main() {
     if (by.sparks) for (const [tr, v] of by.sparks) {
       if (v < 0.01) continue;
       eachHit(tr, t, 1.3, (age, a, h) => {
-        const ox = RW * (0.1 + 0.8 * rnd(tr.seed, h, 11)), oy = cy + (rnd(tr.seed, h, 12) - 0.5) * 640;
+        const ox = RW * (0.1 + 0.8 * rnd(tr.seed, h, 11)), oy = A.y0 + A.h * rnd(tr.seed, h, 12);
         rg.strokeStyle = `rgba(${tr.light},${a * (1 - age / 1.3) ** 1.5 * v * I})`; rg.lineWidth = 2.5;
         rg.beginPath();
         for (let q = 0; q < 9; q++) {
@@ -3241,8 +3452,8 @@ void main() {
     rg.fillStyle = tg; rg.fillRect(0, 0, RW, 640);
 
     // Bandas: se apilan desde abajo (por encima de la zona que tapa Instagram); cada una ocupa lugar según su presencia
-    const X = 40, W = RW - 2 * X, GAP = 14, BOTTOM = split ? 1690 : 1500;   // en mitades bajan más, para aprovechar el espacio
-    const AVAIL = split ? BOTTOM - 970 : 980;                              // alto disponible para las bandas
+    const X = 40, W = RW - 2 * X, GAP = 14, BOTTOM = 1690;                  // bajan hasta abajo, para aprovechar el espacio
+    const AVAIL = BOTTOM - (split ? 970 : 520);                            // alto disponible para las bandas
     const H = Math.max(split ? 34 : 48, Math.min(120, (AVAIL - GAP * (n - 1)) / n));
     // Efectos de zoom: la pista destacada se hace más alta y las demás le hacen lugar
     const fx = settings.stemsFx || 'enter', jn = Math.max(0, Math.floor(t * BAR_RATE));

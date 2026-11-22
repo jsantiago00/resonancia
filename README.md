@@ -41,16 +41,21 @@ Graban el tema entero a 1080×1920 y descargan el video (Chrome o Edge en comput
   - **Fondo:** una foto, un video (sin sonido, en bucle) o cualquiera de los visuales de la app (gota, túnel, etc.), que reacciona al audio.
   - **Master opcional:** si se carga, se escucha el master (la mezcla final) y las pistas sólo se dibujan.
   - **Pistas:** se pueden renombrar, colorear, quitar (✕) y escuchar solas (🎧) para reconocerlas. Los grupos (voces, guitarras…) comparten color y, con «1 banda», se dibujan como una sola. Nombres, colores y grupos se recuerdan por nombre de archivo. Además: opacidad general y un efecto (zoom a la que entra, zoom a la que más suena o latido).
-  - **Destellos:** cada pista dispara un dibujo hecho con trazos según su nombre, en cada ataque (nota, rasguido, golpe):
-    - *voz* → anillos que se abren y un aura que respira con la voz.
-    - *acústica / guitarra* → una guitarra dibujada por pista; en cada rasguido le vibran las cuerdas.
-    - *bajo* → una onda grave y lenta con un pulso de luz en cada nota.
-    - *bata* → una batería dibujada; cada golpe se reconoce por cómo suena (bombo, redoblante, hi-hat o platillo) y se enciende esa pieza. Si la pista se llama *kick*, *caja*, *hh*, *crash*… va directo a esa pieza.
-    - *coro* → estrellitas que florecen y titilan.
+  - **Destellos:** cada pista dispara un dibujo hecho con trazos según su nombre. Los instrumentos se dibujan solos, línea por línea, cuando la pista entra, y se borran cuando se va; cada vez que vuelve a entrar aparecen en otro lugar, y mientras suenan flotan despacio.
+    - *acústica / guitarra* → una guitarra por pista; en cada rasguido le vibran las cuerdas.
+    - *bajo* → un bajo de cuatro cuerdas que vibran lento.
+    - *bata* → una batería; cada golpe se reconoce por cómo suena (bombo, redoblante, hi-hat o platillo) y se enciende esa pieza. Si la pista se llama *kick*, *caja*, *hh*, *crash*… va directo a esa pieza.
+    - *voz* → un micrófono que se ilumina con la voz y suelta ondas.
+    - *piano / teclado / synth* → un teclado: se hunde la tecla y sube una notita.
+    - *coro* → bandadas de pájaros que cruzan aleteando.
+    - *violín / cello / orquesta* → ramas que crecen desde los bordes.
+    - *flauta / vientos / saxo* → espirales que se desenrollan.
+    - *pad / ambient / textura* → gotas que abren ondas en el agua.
+    - *fx / ruido / riser* → rayos.
     - *uuu / mmm / nnn* → figuras de Lissajous que giran y se desdoblan en rojo y cian.
-    - lo demás → chispas.
+    - lo demás → chispas. También hay *estrellas*, *anillos* y *onda* para elegir a mano.
     El menú de cada pista permite elegir otro dibujo o ninguno; el control «Destellos» ajusta la intensidad (a la izquierda, apagados).
-    Con fondo **⬛ Negro** y «Sólo los dibujos» quedan únicamente los trazos, centrados, sin las bandas.
+    Con fondo **⬛ Negro** y «Sólo los dibujos» quedan únicamente los trazos, sin las bandas.
   - **Textos:** cada uno con su momento, duración y tamaño; si dos coinciden se apilan. También se puede pegar una lista, una línea por texto: `0:22 bueno, antes de que te aburras`.
 
 ## Como fondo de pantalla en Windows
