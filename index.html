@@ -200,7 +200,7 @@
 <div id="stems" class="panel">
   <h2>Pistas 9:16 <button id="stemsClose" title="Salir del modo pistas">✕</button></h2>
   <h3>Fondo</h3>
-  <div class="pick" id="stemsBg"><button data-bg="photo">📷 Foto</button><button data-bg="video">🎞 Video</button><button data-bg="scene">✨ Visual</button></div>
+  <div class="pick" id="stemsBg"><button data-bg="photo">📷 Foto</button><button data-bg="video">🎞 Video</button><button data-bg="scene">✨ Visual</button><button data-bg="black">⬛ Negro</button></div>
   <label class="file" id="stemsPhotoLbl">📷 Elegir la foto…<input type="file" accept="image/*" id="stemsPhoto"></label>
   <label class="file" id="stemsVideoLbl">🎞 Elegir el video…<input type="file" accept="video/*" id="stemsVideo"></label>
   <label class="chk" id="stemsZoomLbl"><input type="checkbox" id="stemsZoom"> Zoom lento en la foto</label>
@@ -235,6 +235,7 @@
     </select>
   </label>
   <label class="row">Destellos según el nombre de la pista<input type="range" id="stemsSpark" min="0" max="1.5" step="0.05" value="1"></label>
+  <label class="chk" title="No dibuja las bandas con la forma de onda: quedan sólo los destellos"><input type="checkbox" id="stemsOnlyFx"> Sólo los dibujos (sin las bandas)</label>
   <p class="note">voz → ondas · acústica/guitarra → una guitarra que vibra · bajo → onda grave · bata → una batería que reconoce bombo, caja, hi-hat y platillo · coro → estrellitas · uuu/mmm/nnn → figuras raras · lo demás → chispas. Se cambia con el menú de cada pista. Todo a la izquierda = sin destellos.</p>
   <h3>Textos</h3>
   <div id="stemsTexts"></div>
@@ -2977,7 +2978,7 @@ void main() {
   function drawSparks(t, split) {
     const I = settings.stemsSpark ?? 1;
     if (!(I > 0) || !stems.tracks.length) return;
-    const cy = split ? 470 : 560;                                    // centro de la zona de los destellos
+    const cy = split ? 470 : settings.stemsOnlyFx ? 860 : 560;      // centro de la zona de los destellos (sin bandas, al medio)
     const by = {};                                                   // pistas por tipo (todas, para que no salten de lugar)
     for (const tr of stems.tracks) { const k = kindOf(tr); if (k !== 'off') (by[k] ||= []).push([tr, visOf(tr, t)]); }
     rg.save();
@@ -3224,6 +3225,10 @@ void main() {
       lc.filter = 'blur(5px)';
       lc.drawImage(recC, -8, -8, 214, 368);
       stems.glass = stems.live;
+    } else if (settings.stemsBg === 'black') {
+      rg.fillStyle = '#000'; rg.fillRect(0, 0, RW, RH);
+      if (!stems.black) { stems.black = Object.assign(document.createElement('canvas'), { width: 4, height: 4 }); stems.black.getContext('2d').fillRect(0, 0, 4, 4); }
+      Object.assign(stems, { glass: stems.black, bx: 0, by: 0, bw: RW, bh: RH });
     } else {
       if (!stems.bg) buildStemsBg();
       const z = 1 + (settings.stemsZoom !== false && stems.dur ? 0.08 * Math.min(1, t / stems.dur) : 0);
@@ -3258,7 +3263,7 @@ void main() {
       if (sh + GAP * sv > AVAIL) fit = Math.max(0.3, (AVAIL - GAP * sv) / sh);
     }
     let y = BOTTOM, seen = 0;
-    for (let i = n - 1; i >= 0; i--) {
+    if (!settings.stemsOnlyFx) for (let i = n - 1; i >= 0; i--) {
       const tr = stems.bands[i], v = visOf(tr, t);
       if (v < 0.004) continue;
       const h = H * zoomOf(tr) * fit;
@@ -3404,7 +3409,7 @@ void main() {
     $('#stemsMode').hidden = $('#stemsSplitLbl').hidden = kind !== 'scene';
     syncVideo(stems.playing, stemsTime());
   }
-  setStemsBg(['scene', 'video'].includes(settings.stemsBg) ? settings.stemsBg : 'photo');
+  setStemsBg(['scene', 'video', 'black'].includes(settings.stemsBg) ? settings.stemsBg : 'photo');
   $('#stemsVideo').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) loadStemsVideo(f); });
   document.querySelectorAll('#stemsBg button').forEach(b => b.addEventListener('click', () => setStemsBg(b.dataset.bg)));
   $('#stemsMode').addEventListener('change', e => setMode(e.target.value));
@@ -3414,6 +3419,8 @@ void main() {
   $('#stemsFx').addEventListener('change', e => { settings.stemsFx = e.target.value; save(); });
   $('#stemsSpark').value = settings.stemsSpark ?? 1;
   $('#stemsSpark').addEventListener('input', e => { settings.stemsSpark = +e.target.value; save(); });
+  $('#stemsOnlyFx').checked = !!settings.stemsOnlyFx;
+  $('#stemsOnlyFx').addEventListener('change', e => { settings.stemsOnlyFx = e.target.checked; save(); });
   stems.texts = (settings.stemsTexts || parseStemTexts(settings.stemsText || '')).map(x => ({ t: +x.t || 0, d: +x.d || 3, size: x.size === 0 || x.size === 2 ? x.size : 1, s: String(x.s || '') }));
   paintTexts();
   $('#stemsAddText').addEventListener('click', () => {

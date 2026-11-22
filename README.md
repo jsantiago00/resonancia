@@ -50,6 +50,7 @@ Graban el tema entero a 1080×1920 y descargan el video (Chrome o Edge en comput
     - *uuu / mmm / nnn* → figuras de Lissajous que giran y se desdoblan en rojo y cian.
     - lo demás → chispas.
     El menú de cada pista permite elegir otro dibujo o ninguno; el control «Destellos» ajusta la intensidad (a la izquierda, apagados).
+    Con fondo **⬛ Negro** y «Sólo los dibujos» quedan únicamente los trazos, centrados, sin las bandas.
   - **Textos:** cada uno con su momento, duración y tamaño; si dos coinciden se apilan. También se puede pegar una lista, una línea por texto: `0:22 bueno, antes de que te aburras`.
 
 ## Como fondo de pantalla en Windows
