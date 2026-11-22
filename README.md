@@ -41,6 +41,15 @@ Graban el tema entero a 1080×1920 y descargan el video (Chrome o Edge en comput
   - **Fondo:** una foto, un video (sin sonido, en bucle) o cualquiera de los visuales de la app (gota, túnel, etc.), que reacciona al audio.
   - **Master opcional:** si se carga, se escucha el master (la mezcla final) y las pistas sólo se dibujan.
   - **Pistas:** se pueden renombrar, colorear, quitar (✕) y escuchar solas (🎧) para reconocerlas. Los grupos (voces, guitarras…) comparten color y, con «1 banda», se dibujan como una sola. Nombres, colores y grupos se recuerdan por nombre de archivo. Además: opacidad general y un efecto (zoom a la que entra, zoom a la que más suena o latido).
+  - **Destellos:** cada pista dispara un dibujo hecho con trazos según su nombre, en cada ataque (nota, rasguido, golpe):
+    - *voz* → anillos que se abren y un aura que respira con la voz.
+    - *acústica / guitarra* → una guitarra dibujada por pista; en cada rasguido le vibran las cuerdas.
+    - *bajo* → una onda grave y lenta con un pulso de luz en cada nota.
+    - *bata* → una batería dibujada; cada golpe se reconoce por cómo suena (bombo, redoblante, hi-hat o platillo) y se enciende esa pieza. Si la pista se llama *kick*, *caja*, *hh*, *crash*… va directo a esa pieza.
+    - *coro* → estrellitas que florecen y titilan.
+    - *uuu / mmm / nnn* → figuras de Lissajous que giran y se desdoblan en rojo y cian.
+    - lo demás → chispas.
+    El menú de cada pista permite elegir otro dibujo o ninguno; el control «Destellos» ajusta la intensidad (a la izquierda, apagados).
   - **Textos:** cada uno con su momento, duración y tamaño; si dos coinciden se apilan. También se puede pegar una lista, una línea por texto: `0:22 bueno, antes de que te aburras`.
 
 ## Como fondo de pantalla en Windows

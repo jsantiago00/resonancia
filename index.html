@@ -75,7 +75,8 @@
   #stems { width: min(380px, calc(100% - 32px)); }
   #stemsList, #stemsGroups { display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr); }
   #stemsGroups:empty { display: none; }
-  .trk select { width: 92px; flex: none; padding: 6px 4px; }
+  .trk select { width: 84px; flex: none; padding: 6px 4px; }
+  .trk select.fx { width: 50px; }
   .trk button { padding: 4px 8px; font-size: 13px; border-radius: 10px; flex: none; }
   .trk button.on { background: var(--accent); border-color: transparent; }
   .trk .chk { flex: none; font-size: 12px; gap: 5px; }
@@ -233,6 +234,8 @@
       <option value="none">Sin efecto</option>
     </select>
   </label>
+  <label class="row">Destellos según el nombre de la pista<input type="range" id="stemsSpark" min="0" max="1.5" step="0.05" value="1"></label>
+  <p class="note">voz → ondas · acústica/guitarra → una guitarra que vibra · bajo → onda grave · bata → una batería que reconoce bombo, caja, hi-hat y platillo · coro → estrellitas · uuu/mmm/nnn → figuras raras · lo demás → chispas. Se cambia con el menú de cada pista. Todo a la izquierda = sin destellos.</p>
   <h3>Textos</h3>
   <div id="stemsTexts"></div>
   <button id="stemsAddText">＋ Texto en 0:00</button>
@@ -2500,7 +2503,9 @@ void main() {
       if (!spans.length) continue;                                   // pista vacía
       sumInto(m, buf);
       for (let j = 0; j < peaks.length; j++) peaks[j] = Math.pow(peaks[j] / max, 0.8);
-      const tr = { file: files[i], name: names[i].slice(pre.length).trim() || names[i], peaks, slow: slowOf(peaks), spans, group: null };
+      const tr = { file: files[i], name: names[i].slice(pre.length).trim() || names[i], peaks, slow: slowOf(peaks), spans, group: null,
+        hits: onsetsOf(peaks), seed: hashStr(files[i].name), fx: '' };
+      tr.hits.c = drumClasses(tr.hits, peaks, buf);
       setStemColor(tr, STEM_COLORS[stems.tracks.length % STEM_COLORS.length]);
       tr.own = tr.color;
       stems.tracks.push(tr);
@@ -2520,7 +2525,7 @@ void main() {
   // Nombres, colores y grupos se recuerdan por nombre de archivo, para no rearmarlos al volver a cargar las pistas
   function saveSetup() {
     const tracks = {};
-    for (const tr of stems.tracks) tracks[tr.file.name] = { name: tr.name, color: tr.own, g: stems.groups.indexOf(tr.group) };
+    for (const tr of stems.tracks) tracks[tr.file.name] = { name: tr.name, color: tr.own, g: stems.groups.indexOf(tr.group), fx: tr.fx };
     settings.stemsSetup = { groups: stems.groups.map(({ name, color, merge }) => ({ name, color, merge })), tracks };
     save();
   }
@@ -2532,6 +2537,7 @@ void main() {
       const o = sv.tracks[tr.file.name];
       if (!o) continue;
       tr.name = String(o.name); tr.own = o.color; tr.group = groups[o.g] || null;
+      tr.fx = SPARK_KINDS[o.fx] ? o.fx : '';
       setStemColor(tr, tr.group ? tr.group.color : tr.own);
     }
     stems.groups = groups.filter(g => stems.tracks.some(tr => tr.group === g));
@@ -2633,13 +2639,19 @@ void main() {
       stems.groups.forEach((g, i) => grp.add(new Option(g.name, i)));
       grp.add(new Option('＋ Grupo nuevo', 'new'));
       grp.value = tr.group ? stems.groups.indexOf(tr.group) : '';
+      const fx = el('select', { className: 'fx', title: 'Destello que dispara esta pista (Auto = según su nombre)' });
+      fx.add(new Option('', ''));
+      for (const [k, n] of Object.entries(SPARK_KINDS)) fx.add(new Option(n, k));
+      const fillFx = () => { fx.options[0].text = SPARK_KINDS[sparkAuto(tr.name)].split(' ')[0] + ' Auto'; };
+      fillFx(); fx.value = tr.fx || '';
+      fx.addEventListener('change', () => { tr.fx = fx.value; saveSetup(); });
       const solo = el('button', { textContent: '🎧', title: 'Escuchar sólo esta pista', className: stems.solo === tr ? 'on' : '' });
       const del = el('button', { textContent: '✕', title: 'Quitar esta pista (del video y de la mezcla)' });
       col.addEventListener('input', () => {
         if (tr.group) return setGroupColor(tr.group, col.value);
         tr.own = col.value; setStemColor(tr, col.value); saveSetup();
       });
-      name.addEventListener('input', () => { tr.name = name.value; saveSetup(); });
+      name.addEventListener('input', () => { tr.name = name.value; fillFx(); saveSetup(); });
       grp.addEventListener('change', () => {
         if (grp.value !== 'new') return setGroup(tr, grp.value === '' ? null : stems.groups[grp.value]);
         const g = { name: 'Grupo ' + (stems.groups.length + 1), color: tr.color, merge: false };
@@ -2649,7 +2661,7 @@ void main() {
       });
       solo.addEventListener('click', () => toggleSolo(tr));
       del.addEventListener('click', () => removeTrack(tr));
-      row.append(col, name, grp, solo, del);
+      row.append(col, name, grp, fx, solo, del);
       box.appendChild(row);
     }
     if (stems.groups.length) gbox.append(el('h3', { textContent: 'Grupos' }));
@@ -2825,6 +2837,355 @@ void main() {
     rg.restore();
   }
 
+  // ---------- Destellos: cada pista dispara un efecto según su nombre, en cada ataque ----------
+  // Todo depende sólo del tiempo del tema (nada de estado), así la vista previa y el video son idénticos
+  // y se puede mover la barra a cualquier lado.
+  const SPARK_KINDS = { strings: '🎸 Guitarra', voice: '🎤 Voz', bass: '〰 Bajo', drums: '🥁 Bata', choir: '✨ Coro', weird: '∞ Raro', sparks: '· Chispas', off: '🚫 Nada' };
+  const plain = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  function sparkAuto(name) {
+    const n = plain(name);
+    if (/^[umn]+$/.test(n.replace(/[^a-z]/g, ''))) return 'weird';          // "uuu", "mmm", "nnn 2", "umn"…
+    if (/coro|choir|chorus|backing|\bbvs?\b/.test(n)) return 'choir';
+    if (/voz|voces|vox|voice|vocal|\blead\b|canto/.test(n)) return 'voice';
+    if (/bajo|bass|\bsub\b/.test(n)) return 'bass';
+    if (/bata|bateria|drum|kick|bombo|snare|caja|redo|hihat|plato|perc|clap|palma|shaker|pander|cajon|\b(hh|hats?|toms?|ride|crash|oh)\b/.test(n)) return 'drums';
+    if (/acus|guit|gtr|electr|criolla|nylon|ukelele|charango|cuerda|riff|strum/.test(n)) return 'strings';
+    return 'sparks';
+  }
+  const kindOf = tr => {
+    if (tr.akey !== tr.name) { tr.akey = tr.name; tr.auto = sparkAuto(tr.name); tr.drum = drumByName(tr.name); }
+    return tr.fx || tr.auto;
+  };
+  // Piezas de la batería: 0 bombo, 1 redoblante (y toms), 2 hi-hat, 3 platillo.
+  // Si la pista se llama "kick", "caja", "hh"… todos sus golpes van a esa pieza.
+  function drumByName(name) {
+    const n = plain(name);
+    if (/kick|bombo|\bbd\b/.test(n)) return 0;
+    if (/snare|caja|redo|\btoms?\b|\bsd\b/.test(n)) return 1;
+    if (/\b(hh|hats?)\b|hihat|shaker/.test(n)) return 2;
+    if (/crash|ride|plato|\boh\b|overhead/.test(n)) return 3;
+    return -1;
+  }
+  // Si no, cada golpe se reconoce por cómo suena en sus primeros 50 ms: mucho grave → bombo;
+  // muy agudo → hi-hat (corto) o platillo (si sigue sonando); lo del medio → redoblante.
+  function drumClasses(hits, pk, buf) {
+    const c = new Uint8Array(hits.t.length), d = buf.getChannelData(0), sr = buf.sampleRate;
+    const n = Math.round(sr * 0.05), al = Math.exp(-2 * Math.PI * 150 / sr);
+    for (let i = 0; i < c.length; i++) {
+      const s0 = Math.floor(hits.t[i] * sr);
+      let lp = 0, el = 0, e = 0, zc = 0, prev = 0;
+      for (let k = s0; k < s0 + n && k < d.length; k++) {
+        const x = d[k];
+        lp = al * lp + (1 - al) * x; el += lp * lp; e += x * x;
+        if ((x > 0) !== (prev > 0)) zc++;
+        prev = x;
+      }
+      const freq = zc * sr / (2 * n), j = Math.round(hits.t[i] * BAR_RATE), tail = (pk[j + 8] || 0) / (pk[j] || 1);
+      c[i] = el / (e + 1e-12) > 0.4 ? 0 : freq > 3500 ? (tail > 0.45 ? 3 : 2) : 1;
+    }
+    return c;
+  }
+  // Guitarra dibujada con trazos, acostada: la caja a la izquierda (cola en x = -440) y el mástil hacia la derecha
+  function guitarPath(g) {
+    g.beginPath();
+    g.moveTo(-440, 0);
+    g.bezierCurveTo(-440, -80, -380, -140, -300, -140); g.bezierCurveTo(-230, -140, -200, -95, -170, -95);
+    g.bezierCurveTo(-140, -95, -110, -112, -70, -112); g.bezierCurveTo(-20, -112, 0, -60, 0, -26);
+    g.lineTo(0, 26);
+    g.bezierCurveTo(0, 60, -20, 112, -70, 112); g.bezierCurveTo(-110, 112, -140, 95, -170, 95);
+    g.bezierCurveTo(-200, 95, -230, 140, -300, 140); g.bezierCurveTo(-380, 140, -440, 80, -440, 0);
+    g.moveTo(-108, 0); g.arc(-150, 0, 42, 0, 2 * Math.PI);                      // boca
+    g.moveTo(-322, -48); g.lineTo(-322, 48); g.moveTo(-336, -48); g.lineTo(-336, 48);   // puente
+    g.moveTo(0, -22); g.lineTo(430, -17); g.moveTo(0, 22); g.lineTo(430, 17);          // mástil
+    for (let f = 1; f <= 14; f++) { const x = 430 - 430 * (1 - Math.pow(2, -f / 12)) * 1.65; g.moveTo(x, -21 + x / 86); g.lineTo(x, 21 - x / 86); }
+    g.moveTo(430, -17); g.lineTo(540, -30); g.lineTo(548, 30); g.lineTo(430, 17);      // clavijero
+    for (let p = 0; p < 3; p++) for (const s of [-1, 1]) { const x = 455 + p * 30, y = s * (24 + p * 2); g.moveTo(x + 7, y + s * 10); g.arc(x, y + s * 10, 7, 0, 2 * Math.PI); }
+  }
+  // Batería dibujada con trazos; cada pieza se dibuja en su lugar y `h` (0..1) es cuánto acaba de sonar
+  const KIT = [
+    (g, h) => {                                                       // bombo, de frente
+      const r = 120 * (1 + 0.07 * h);
+      g.moveTo(r, 130); g.arc(0, 130, r, 0, 2 * Math.PI);
+      g.moveTo(r - 18, 130); g.arc(0, 130, r - 18, 0, 2 * Math.PI);
+      g.moveTo(30, 130); g.arc(0, 130, 30, 0, 2 * Math.PI);
+      g.moveTo(-70, 245); g.lineTo(-95, 275); g.moveTo(70, 245); g.lineTo(95, 275);   // patitas
+    },
+    (g, h) => {                                                       // redoblante, con su soporte
+      const y = 20 - 10 * h, x = -260;
+      g.moveTo(x + 85, y); g.ellipse(x, y, 85, 22, 0, 0, 2 * Math.PI);
+      g.moveTo(x - 85, y); g.lineTo(x - 85, y + 48); g.ellipse(x, y + 48, 85, 22, 0, Math.PI, 0, true); g.lineTo(x + 85, y);
+      for (let k = -2; k <= 2; k++) { g.moveTo(x + k * 32, y + 20 - Math.abs(k) * 3); g.lineTo(x + k * 32, y + 66 - Math.abs(k) * 3); }
+      g.moveTo(x, 90); g.lineTo(x, 230); g.moveTo(x, 230); g.lineTo(x - 50, 275); g.moveTo(x, 230); g.lineTo(x + 50, 275);
+    },
+    (g, h) => {                                                       // hi-hat: dos platillos que se cierran
+      const x = -430, gap = 16 * (1 - h);
+      g.moveTo(x + 80, -100 - gap); g.ellipse(x, -100 - gap, 80, 11, 0, 0, 2 * Math.PI);
+      g.moveTo(x + 80, -84); g.ellipse(x, -84, 80, 11, 0, 0, 2 * Math.PI);
+      g.moveTo(x, -120 - gap); g.lineTo(x, 230); g.moveTo(x, 230); g.lineTo(x - 45, 275); g.moveTo(x, 230); g.lineTo(x + 45, 275);
+    },
+    (g, h, t) => {                                                    // platillo: tiembla mientras suena
+      const x = 310, a = -0.18 + 0.06 * h * Math.sin(t * 40);
+      g.moveTo(x + 115 * Math.cos(a), -150 + 115 * Math.sin(a)); g.ellipse(x, -150, 115, 18, a, 0, 2 * Math.PI);
+      g.moveTo(x + 12, -150); g.ellipse(x, -150, 12, 4, a, 0, 2 * Math.PI);
+      g.moveTo(x, -140); g.lineTo(x + 30, 230); g.moveTo(x + 30, 230); g.lineTo(x - 15, 275); g.moveTo(x + 30, 230); g.lineTo(x + 75, 275);
+    },
+  ];
+  const KIT_HIT = [[0, 130], [-260, 10], [-430, -95], [310, -150]];   // dónde salta el destello de cada pieza
+  const KIT_DECAY = [6, 7, 10, 2.5];
+  const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
+  const rnd = (s, i, k) => {                                         // azar fijo: mismo golpe, mismo dibujo
+    let h = Math.imul(s ^ Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(k + 7, 0x85ebca77), 0xc2b2ae3d);
+    h ^= h >>> 15; h = Math.imul(h, 0x27d4eb2f); h ^= h >>> 13;
+    return (h >>> 0) / 4294967296;
+  };
+  // Ataques: la envolvente sube de golpe (nota, rasguido, golpe de bata). Al menos 120 ms entre uno y otro.
+  function onsetsOf(pk) {
+    const t = [], a = [];
+    for (let j = 2, last = -9; j < pk.length; j++) {
+      if (pk[j] > 0.18 && pk[j] > Math.max(pk[j - 1], pk[j - 2]) * 1.35 + 0.04 && j - last > 3) { t.push(j / BAR_RATE); a.push(Math.min(1, pk[j])); last = j; }
+    }
+    return { t: Float32Array.from(t), a: Float32Array.from(a) };
+  }
+  // Recorre los ataques de los últimos `life` segundos: fn(edad, fuerza, número de ataque)
+  function eachHit(tr, t, life, fn) {
+    const T = tr.hits.t;
+    let lo = 0, hi = T.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (T[m] < t - life) lo = m + 1; else hi = m; }
+    for (let i = lo; i < T.length && T[i] <= t; i++) fn(t - T[i], tr.hits.a[i], i);
+  }
+  const envOf = (tr, t) => {
+    const p = tr.peaks, j = Math.floor(t * BAR_RATE);
+    return j < 1 || j >= p.length - 1 ? 0 : (p[j - 1] + p[j] + p[j + 1]) / 3;
+  };
+  const glowSprites = new Map();
+  function glow(tr, x, y, r, a) {
+    if (a < 0.004 || r < 1) return;
+    let sp = glowSprites.get(tr.tint);
+    if (!sp) {
+      sp = Object.assign(document.createElement('canvas'), { width: 64, height: 64 });
+      const g = sp.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gr.addColorStop(0, `rgba(${tr.light},1)`); gr.addColorStop(0.25, `rgba(${tr.tint},.55)`); gr.addColorStop(1, `rgba(${tr.tint},0)`);
+      g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      glowSprites.set(tr.tint, sp);
+    }
+    rg.globalAlpha = Math.min(1, a);
+    rg.drawImage(sp, x - r, y - r, 2 * r, 2 * r);
+    rg.globalAlpha = 1;
+  }
+  const LISSA = [[1, 2], [2, 3], [3, 4], [3, 5], [1, 3], [4, 5], [5, 6]];
+
+  function drawSparks(t, split) {
+    const I = settings.stemsSpark ?? 1;
+    if (!(I > 0) || !stems.tracks.length) return;
+    const cy = split ? 470 : 560;                                    // centro de la zona de los destellos
+    const by = {};                                                   // pistas por tipo (todas, para que no salten de lugar)
+    for (const tr of stems.tracks) { const k = kindOf(tr); if (k !== 'off') (by[k] ||= []).push([tr, visOf(tr, t)]); }
+    rg.save();
+    rg.globalCompositeOperation = 'lighter';
+    rg.lineCap = 'round'; rg.lineJoin = 'round';
+
+    // 🎸 Guitarra: una guitarra dibujada con trazos por cada pista; en cada rasguido le vibran las cuerdas
+    if (by.strings) {
+      const n = by.strings.length, sc = n === 1 ? 0.95 : n === 2 ? 0.78 : 0.6;
+      by.strings.forEach(([tr, v], k) => {
+        if (v < 0.01) return;
+        const e = envOf(tr, t), flip = k % 2 ? -1 : 1, gy = cy + (k - (n - 1) / 2) * Math.min(300, 760 / n);
+        rg.save();
+        rg.translate(RW / 2, gy); rg.rotate(-0.3 * flip + 0.02 * Math.sin(t * 0.4 + k)); rg.scale(sc * flip, sc);
+        // trazo doble, levemente corrido, como dibujado a mano
+        guitarPath(rg);
+        rg.strokeStyle = `rgba(${tr.light},${(0.3 + 0.5 * e) * v * I})`; rg.lineWidth = 2.5 / sc; rg.stroke();
+        rg.save();
+        rg.translate(3 + 1.5 * Math.sin(t * 1.3 + k), -2); rg.rotate(0.006);
+        guitarPath(rg);
+        rg.strokeStyle = `rgba(${tr.tint},${(0.15 + 0.3 * e) * v * I})`; rg.lineWidth = 1.5 / sc; rg.stroke();
+        rg.restore();
+        // cada ataque es un rasguido (todas las cuerdas, una tras otra) o una nota punteada (una cuerda)
+        const amp = [0, 0, 0, 0, 0, 0], ph = [0, 0, 0, 0, 0, 0];
+        let last = null;
+        eachHit(tr, t, 1.8, (age, a, i) => {
+          const strum = rnd(tr.seed, i, 1) < 0.6, one = Math.floor(rnd(tr.seed, i, 2) * 6);
+          for (let s = 0; s < 6; s++) {
+            if (!strum && s !== one) continue;
+            const ag = age - (strum ? s * 0.012 : 0);
+            if (ag < 0) continue;
+            const m = a * Math.exp(-ag * 2.6);
+            if (m > amp[s]) { amp[s] = m; ph[s] = ag * (46 + s * 4); }
+          }
+          last = [age, a];
+        });
+        for (let s = 0; s < 6; s++) {
+          const y0 = (s - 2.5) * 13, y1 = (s - 2.5) * 10, m = amp[s] * v * I;
+          rg.beginPath();
+          for (let q = 0; q <= 40; q++) {
+            const u = q / 40, d = m * 16 * Math.sin(PI * u) * Math.cos(ph[s]);
+            rg.lineTo(-329 + 759 * u, y0 + (y1 - y0) * u + d);
+          }
+          rg.strokeStyle = `rgba(${tr.light},${(0.25 + 0.4 * e) * v * I})`; rg.lineWidth = (0.9 + 0.25 * s) / sc; rg.stroke();
+          if (m > 0.01) {
+            rg.strokeStyle = `rgba(${tr.tint},${0.35 * m})`; rg.lineWidth = 8 / sc; rg.stroke();
+            rg.strokeStyle = `rgba(${tr.light},${0.95 * m})`; rg.lineWidth = (1.2 + 0.3 * s) / sc; rg.stroke();
+          }
+        }
+        if (last && last[0] < 0.5) glow(tr, -150, 0, 70 + 70 * last[1], (1 - last[0] / 0.5) * last[1] * 0.8 * v * I);   // la boca se enciende
+        rg.restore();
+      });
+    }
+
+    // 🎤 Voz: cada voz tiene su lugar; un aura que respira con la voz y anillos que se abren en cada frase
+    if (by.voice) by.voice.forEach(([tr, v], k, all) => {
+      if (v < 0.01) return;
+      const x = RW * (k + 1) / (all.length + 1), y = cy - 70, e = envOf(tr, t);
+      glow(tr, x, y, 120 + 280 * e, 0.5 * e * v * I);
+      eachHit(tr, t, 2.4, (age, a) => {
+        const f = age / 2.4, r = 30 + 460 * (1 - Math.exp(-age * 1.4));
+        rg.strokeStyle = `rgba(${tr.light},${a * (1 - f) ** 2 * 0.75 * v * I})`; rg.lineWidth = 1 + 3 * (1 - f);
+        rg.beginPath(); rg.arc(x, y, r, 0, 7); rg.stroke();
+      });
+    });
+
+    // 〰 Bajo: una onda grave y lenta abajo de la zona, con un pulso de luz en cada nota
+    if (by.bass) by.bass.forEach(([tr, v], k) => {
+      if (v < 0.01) return;
+      const e = envOf(tr, t), y = cy + 330 + k * 26;
+      eachHit(tr, t, 1.2, (age, a) => {
+        rg.save(); rg.translate(RW / 2, y); rg.scale(1, 0.32);
+        glow(tr, 0, 0, 200 + 700 * (1 - Math.exp(-age * 3)), a * (1 - age / 1.2) ** 2 * 0.55 * v * I);
+        rg.restore();
+      });
+      for (let l = 0; l < 3; l++) {
+        rg.beginPath();
+        for (let q = 0; q <= 60; q++) {
+          const u = q / 60, yy = y + e * 80 * Math.sin(PI * u) * Math.sin(u * PI * 3 + t * (2 + l * 0.7) + l * 1.3);
+          q ? rg.lineTo(u * RW, yy) : rg.moveTo(0, yy);
+        }
+        rg.strokeStyle = `rgba(${l ? tr.tint : tr.light},${(0.55 - l * 0.15) * e * v * I})`; rg.lineWidth = 5 - l * 1.4;
+        rg.stroke();
+      }
+    });
+
+    // 🥁 Bata: una batería dibujada con trazos (una sola para todas las pistas de bata). Cada golpe se reconoce
+    // (bombo, redoblante, hi-hat o platillo) y se enciende esa pieza, con su dibujito
+    if (by.drums) {
+      const sv = Math.max(...by.drums.map(d => d[1]));
+      if (sv > 0.01) {
+        const H = [0, 0, 0, 0], E = [null, null, null, null];
+        for (const [tr, v] of by.drums) {
+          if (v < 0.01) continue;
+          eachHit(tr, t, 1.5, (age, a, i) => {
+            const p = tr.drum >= 0 ? tr.drum : tr.hits.c[i], h = a * Math.exp(-age * KIT_DECAY[p]) * v;
+            if (h > H[p]) { H[p] = h; E[p] = { tr, age, a: a * v }; }
+          });
+        }
+        rg.save();
+        rg.translate(RW / 2, cy - 20); rg.scale(split ? 0.8 : 0.9, split ? 0.8 : 0.9);
+        KIT.forEach((draw, p) => {
+          rg.beginPath(); draw(rg, H[p], t);
+          rg.strokeStyle = `rgba(255,255,255,${0.22 * sv * I})`; rg.lineWidth = 2.5; rg.stroke();
+          const ev = E[p];
+          if (!ev || H[p] < 0.02) return;
+          const { tr, age, a } = ev, [hx, hy] = KIT_HIT[p], al = a * I;
+          rg.strokeStyle = `rgba(${tr.tint},${0.4 * H[p] * I})`; rg.lineWidth = 9; rg.stroke();
+          rg.strokeStyle = `rgba(${tr.light},${H[p] * I})`; rg.lineWidth = 2.5; rg.stroke();
+          glow(tr, hx, hy, 60 + 120 * H[p], 0.8 * H[p] * I);
+          rg.strokeStyle = `rgba(${tr.light},${al})`;
+          rg.beginPath();
+          if (p === 0 && age < 0.8) {                                 // bombo: una onda que sale del parche
+            rg.lineWidth = 3 * (1 - age / 0.8) + 0.5; rg.strokeStyle = `rgba(${tr.light},${al * (1 - age / 0.8) ** 2})`;
+            rg.arc(hx, hy, 125 + 420 * (1 - Math.exp(-age * 4)), 0, 2 * PI);
+          } else if (p === 1 && age < 0.4) {                          // redoblante: chispazo arriba del parche
+            rg.lineWidth = 2.5; rg.strokeStyle = `rgba(${tr.light},${al * (1 - age / 0.4)})`;
+            for (let q = 0; q < 8; q++) {
+              const an = -PI + q / 7 * PI, r = 40 + 220 * age, c = Math.cos(an), s = Math.sin(an);
+              rg.moveTo(hx + c * r, hy + s * r * 0.8); rg.lineTo(hx + c * (r + 34 * (1 - age / 0.4)), hy + s * (r + 34 * (1 - age / 0.4)) * 0.8);
+            }
+          } else if (p === 2 && age < 0.25) {                         // hi-hat: tres rayitas arriba
+            rg.lineWidth = 2; rg.strokeStyle = `rgba(${tr.light},${al * (1 - age / 0.25)})`;
+            for (let q = -1; q <= 1; q++) { rg.moveTo(hx + q * 34, hy - 40 - age * 120); rg.lineTo(hx + q * 44, hy - 70 - age * 160); }
+          } else if (p === 3 && age < 1.5) {                          // platillo: anillos de vibración
+            rg.lineWidth = 1.5;
+            for (let q = 0; q < 3; q++) {
+              const ag = age - q * 0.12;
+              if (ag < 0) continue;
+              rg.moveTo(hx + (120 + ag * 160) * Math.cos(-0.18), hy + (120 + ag * 160) * Math.sin(-0.18));
+              rg.ellipse(hx, hy, 120 + ag * 160, 20 + ag * 30, -0.18, 0, 2 * PI);
+            }
+            rg.strokeStyle = `rgba(${tr.light},${al * 0.6 * (1 - age / 1.5) ** 2})`;
+          }
+          rg.stroke();
+        });
+        rg.restore();
+        const k = E[0];                                               // bombazo fuerte: se encienden los bordes
+        if (k && k.a > 0.65 && k.age < 0.25) {
+          const vg = rg.createRadialGradient(RW / 2, RH / 2, 450, RW / 2, RH / 2, 1150);
+          vg.addColorStop(0, `rgba(${k.tr.tint},0)`); vg.addColorStop(1, `rgba(${k.tr.tint},${0.2 * (1 - k.age / 0.25) * I})`);
+          rg.fillStyle = vg; rg.fillRect(0, 0, RW, RH);
+        }
+      }
+    }
+
+    // ✨ Coro: un cielo de puntitos que titilan con el coro, y estrellas que florecen en cada entrada
+    if (by.choir) for (const [tr, v] of by.choir) {
+      if (v < 0.01) continue;
+      const e = envOf(tr, t);
+      for (let i = 0; i < 16; i++) {
+        const tw = 0.5 + 0.5 * Math.sin(t * (1.5 + 2 * rnd(tr.seed, i, 6)) + i);
+        glow(tr, RW * rnd(tr.seed, i, 7), cy + (rnd(tr.seed, i, 8) - 0.5) * 760, 4 + 12 * e * tw, e * tw * 0.7 * v * I);
+      }
+      eachHit(tr, t, 2.6, (age, a, h) => {
+        const b = Math.sin(PI * age / 2.6) * a, al = b * v * I;
+        rg.strokeStyle = `rgba(${tr.light},${al})`; rg.lineWidth = 1.5;
+        rg.beginPath();
+        for (let q = 0; q < 7; q++) {
+          const x = RW * rnd(tr.seed, h * 7 + q, 9), y = cy + (rnd(tr.seed, h * 7 + q, 10) - 0.5) * 760 - age * 30, s = 6 + 24 * b;
+          glow(tr, x, y, s * 2, al * 0.8);
+          rg.moveTo(x - s, y); rg.lineTo(x + s, y); rg.moveTo(x, y - s); rg.lineTo(x, y + s);
+        }
+        rg.stroke();
+      });
+    }
+
+    // ∞ Raro (uuu, mmm, nnn): una figura de Lissajous que gira; en cada ataque se desdobla en rojo y cian
+    if (by.weird) by.weird.forEach(([tr, v], k) => {
+      if (v < 0.01) return;
+      const e = envOf(tr, t), [p, q] = LISSA[tr.seed % LISSA.length], R = 160 + 190 * e + k * 16;
+      let g = 0;
+      eachHit(tr, t, 0.45, (age, a) => { g = Math.max(g, a * (1 - age / 0.45)); });
+      rg.save();
+      rg.translate(RW / 2, cy); rg.rotate(t * 0.15 + k * 0.9);
+      const path = (dx, col, al) => {
+        rg.beginPath();
+        for (let i = 0; i <= 240; i++) {
+          const s = i / 240 * 2 * PI, x = dx + R * Math.sin(p * s + t * 0.5 + k), y = R * Math.sin(q * s);
+          i ? rg.lineTo(x, y) : rg.moveTo(x, y);
+        }
+        rg.strokeStyle = `rgba(${col},${al})`; rg.stroke();
+      };
+      rg.lineWidth = 2;
+      path(0, tr.light, (0.15 + 0.6 * e) * v * I);
+      if (g > 0.02) { path(20 * g, '255,40,90', 0.8 * g * v * I); path(-20 * g, '40,220,255', 0.8 * g * v * I); }
+      rg.restore();
+    });
+
+    // · Chispas: lo que no tiene nombre conocido tira chispas que caen
+    if (by.sparks) for (const [tr, v] of by.sparks) {
+      if (v < 0.01) continue;
+      eachHit(tr, t, 1.3, (age, a, h) => {
+        const ox = RW * (0.1 + 0.8 * rnd(tr.seed, h, 11)), oy = cy + (rnd(tr.seed, h, 12) - 0.5) * 640;
+        rg.strokeStyle = `rgba(${tr.light},${a * (1 - age / 1.3) ** 1.5 * v * I})`; rg.lineWidth = 2.5;
+        rg.beginPath();
+        for (let q = 0; q < 9; q++) {
+          const an = rnd(tr.seed, h * 9 + q, 13) * 2 * PI, sp = 250 + 450 * rnd(tr.seed, h * 9 + q, 14);
+          const dx = Math.cos(an) * sp, dy = Math.sin(an) * sp, x = ox + dx * age, y = oy + dy * age + 260 * age * age;
+          rg.moveTo(x, y); rg.lineTo(x - dx * 0.05, y - (dy + 520 * age) * 0.05);
+        }
+        rg.stroke();
+        if (age < 0.15) glow(tr, ox, oy, 30 + 40 * a, (1 - age / 0.15) * a * v * I);
+      });
+    }
+    rg.restore();
+  }
+
   function composeStems() {
     const now = performance.now(), t = stemsTime(), n = stems.bands.length;
     rg.globalAlpha = 1;
@@ -2913,6 +3274,7 @@ void main() {
       rg.fillRect(RW / 2 - 1, y - 10, 2, BOTTOM - GAP - y + 20);
       rg.restore();
     }
+    drawSparks(t, split);                                          // encima de las bandas, para que siempre se vean
 
     // Textos: arriba y centrados, fuera de la zona que tapa Instagram
     // Si dos coinciden, el segundo se apila debajo del primero
@@ -3050,6 +3412,8 @@ void main() {
   $('#stemsAlpha').addEventListener('input', e => { settings.stemsAlpha = +e.target.value; save(); });
   $('#stemsFx').value = settings.stemsFx || 'enter';
   $('#stemsFx').addEventListener('change', e => { settings.stemsFx = e.target.value; save(); });
+  $('#stemsSpark').value = settings.stemsSpark ?? 1;
+  $('#stemsSpark').addEventListener('input', e => { settings.stemsSpark = +e.target.value; save(); });
   stems.texts = (settings.stemsTexts || parseStemTexts(settings.stemsText || '')).map(x => ({ t: +x.t || 0, d: +x.d || 3, size: x.size === 0 || x.size === 2 ? x.size : 1, s: String(x.s || '') }));
   paintTexts();
   $('#stemsAddText').addEventListener('click', () => {
