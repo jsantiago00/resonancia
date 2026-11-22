@@ -42,10 +42,10 @@ Graban el tema entero a 1080×1920 y descargan el video (Chrome o Edge en comput
   - **Master opcional:** si se carga, se escucha el master (la mezcla final) y las pistas sólo se dibujan.
   - **Pistas:** se pueden renombrar, colorear, quitar (✕) y escuchar solas (🎧) para reconocerlas. Los grupos (voces, guitarras…) comparten color y, con «1 banda», se dibujan como una sola. Nombres, colores y grupos se recuerdan por nombre de archivo. Además: opacidad general y un efecto (zoom a la que entra, zoom a la que más suena o latido).
   - **Destellos:** cada pista dispara un dibujo hecho con trazos según su nombre. Los instrumentos se dibujan solos, línea por línea, cuando la pista entra, y se borran cuando se va; cada vez que vuelve a entrar aparecen en otro lugar, y mientras suenan flotan despacio.
-    - *acústica / guitarra* → una guitarra por pista; en cada rasguido le vibran las cuerdas.
-    - *bajo* → un bajo de cuatro cuerdas que vibran lento.
-    - *bata* → una batería; cada golpe se reconoce por cómo suena (bombo, redoblante, hi-hat o platillo) y se enciende esa pieza. Si la pista se llama *kick*, *caja*, *hh*, *crash*… va directo a esa pieza.
-    - *voz* → un micrófono que se ilumina con la voz y suelta ondas.
+    - *acústica / guitarra* → una guitarra en abstracto (lazos sueltos y cuerdas en abanico); en cada rasguido le vibran las cuerdas.
+    - *bajo* → lo mismo, más grande y con cuatro cuerdas gruesas que vibran lento.
+    - *bata* → una batería (sólo las piezas, sin soportes); cada golpe se reconoce por cómo suena (bombo, redoblante, hi-hat o platillo) y se enciende esa pieza. Si la pista se llama *kick*, *caja*, *hh*, *crash*… va directo a esa pieza.
+    - *voz* → un micrófono en abstracto: una malla de puntitos que laten con la voz y sueltan ondas.
     - *piano / teclado / synth* → un teclado: se hunde la tecla y sube una notita.
     - *coro* → bandadas de pájaros que cruzan aleteando.
     - *violín / cello / orquesta* → ramas que crecen desde los bordes.
@@ -54,7 +54,7 @@ Graban el tema entero a 1080×1920 y descargan el video (Chrome o Edge en comput
     - *fx / ruido / riser* → rayos.
     - *uuu / mmm / nnn* → figuras de Lissajous que giran y se desdoblan en rojo y cian.
     - lo demás → chispas. También hay *estrellas*, *anillos* y *onda* para elegir a mano.
-    El menú de cada pista permite elegir otro dibujo o ninguno; el control «Destellos» ajusta la intensidad (a la izquierda, apagados).
+    El menú de cada pista permite elegir otro dibujo o ninguno; **🎲 Dibujos al azar** los reparte al azar entre todas las pistas (sin repetir hasta usarlos todos) y **↺ Según el nombre** vuelve a lo automático; el control «Destellos» ajusta la intensidad (a la izquierda, apagados).
     Con fondo **⬛ Negro** y «Sólo los dibujos» quedan únicamente los trazos, sin las bandas.
   - **Textos:** cada uno con su momento, duración y tamaño; si dos coinciden se apilan. También se puede pegar una lista, una línea por texto: `0:22 bueno, antes de que te aburras`.
 

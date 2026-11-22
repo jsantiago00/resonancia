@@ -235,6 +235,7 @@
     </select>
   </label>
   <label class="row">Destellos según el nombre de la pista<input type="range" id="stemsSpark" min="0" max="1.5" step="0.05" value="1"></label>
+  <div class="frow"><button id="stemsRandom" style="flex:1" title="Reparte al azar todos los dibujos entre las pistas (tocalo de nuevo para otra combinación)">🎲 Dibujos al azar</button><button id="stemsAutoFx" style="flex:1" title="Vuelve a elegir cada dibujo según el nombre de la pista">↺ Según el nombre</button></div>
   <label class="chk" title="No dibuja las bandas con la forma de onda: quedan sólo los destellos"><input type="checkbox" id="stemsOnlyFx"> Sólo los dibujos (sin las bandas)</label>
   <p class="note">voz → ondas · acústica/guitarra → una guitarra que vibra · bajo → onda grave · bata → una batería que reconoce bombo, caja, hi-hat y platillo · coro → estrellitas · uuu/mmm/nnn → figuras raras · lo demás → chispas. Se cambia con el menú de cada pista. Todo a la izquierda = sin destellos.</p>
   <h3>Textos</h3>
@@ -2895,68 +2896,64 @@ void main() {
     }
     return c;
   }
-  // Guitarra (o bajo) dibujada con trazos, acostada: la caja a la izquierda (cola en x = -440) y el mástil hacia la derecha
-  function guitarPath(g, bass) {
-    const N = bass ? 640 : 430, half = x => 22 - 5 * x / N;
-    g.beginPath();
-    g.moveTo(-440, 0);
-    g.bezierCurveTo(-440, -80, -380, -140, -300, -140); g.bezierCurveTo(-230, -140, -200, -95, -170, -95);
-    g.bezierCurveTo(-140, -95, -110, -112, -70, -112); g.bezierCurveTo(-20, -112, 0, -60, 0, -26);
-    g.lineTo(0, 26);
-    g.bezierCurveTo(0, 60, -20, 112, -70, 112); g.bezierCurveTo(-110, 112, -140, 95, -170, 95);
-    g.bezierCurveTo(-200, 95, -230, 140, -300, 140); g.bezierCurveTo(-380, 140, -440, 80, -440, 0);
-    if (bass) { g.moveTo(-180, -60); g.lineTo(-150, -60); g.lineTo(-150, 60); g.lineTo(-180, 60); g.closePath(); }   // micrófono del bajo
-    else { g.moveTo(-108, 0); g.arc(-150, 0, 42, 0, 2 * Math.PI); }                                                    // boca
-    g.moveTo(-322, -48); g.lineTo(-322, 48); g.moveTo(-336, -48); g.lineTo(-336, 48);   // puente
-    g.moveTo(0, -22); g.lineTo(N, -17); g.moveTo(0, 22); g.lineTo(N, 17);               // mástil
-    for (let f = 1; f <= (bass ? 17 : 14); f++) { const x = N - N * (1 - Math.pow(2, -f / 12)) * 1.65; g.moveTo(x, -half(x) + 1); g.lineTo(x, half(x) - 1); }
-    g.moveTo(N, -17); g.lineTo(N + 110, -30); g.lineTo(N + 118, 30); g.lineTo(N, 17);  // clavijero
-    for (let p = 0; p < (bass ? 2 : 3); p++) for (const s of [-1, 1]) { const x = N + 25 + p * 32, y = s * (34 + p * 2); g.moveTo(x + 7, y); g.arc(x, y, 7, 0, 2 * Math.PI); }
+  // Curva cerrada temblorosa, como un garabato: una elipse de borde ondulado (que se mueve) con un huequito abierto
+  function loop(g, cx, cy, rx, ry, rot, sd, t, wob) {
+    const N = 72, gap = 0.2 + 0.4 * rnd(sd, 0, 90), a0 = 2 * Math.PI * rnd(sd, 0, 91), p1 = 6 * rnd(sd, 0, 92), p2 = 6 * rnd(sd, 0, 93);
+    const c = Math.cos(rot), s = Math.sin(rot);
+    for (let i = 0; i <= N; i++) {
+      const u = a0 + (2 * Math.PI - gap) * i / N, k = 1 + wob * (0.6 * Math.sin(3 * u + p1 + t * 0.7) + 0.4 * Math.sin(5 * u + p2 - t * 0.5));
+      const x = rx * k * Math.cos(u), y = ry * k * Math.sin(u);
+      i ? g.lineTo(cx + x * c - y * s, cy + x * s + y * c) : g.moveTo(cx + x * c - y * s, cy + x * s + y * c);
+    }
   }
-  // Micrófono de pie, con la cabeza (rejilla) arriba, centrada en (0, -95)
-  function micPath(g) {
+  // Guitarra (o bajo) en abstracto: lazos sueltos por caja, la boca, y unas marcas de trastes; las cuerdas se dibujan aparte
+  const NECK = bass => bass ? 700 : 520;
+  function guitarPath(g, bass, sd, t) {
     g.beginPath();
-    g.moveTo(-55, -120); g.arc(0, -120, 55, Math.PI, 0); g.lineTo(55, -70); g.arc(0, -70, 55, 0, Math.PI); g.closePath();
-    for (const y of [-140, -118, -96, -74, -52]) { const w = 50 - Math.max(0, Math.abs(y + 95) - 25) * 0.9; g.moveTo(-w, y); g.lineTo(w, y); }
-    for (const x of [-26, 0, 26]) { const h = Math.sqrt(55 * 55 - x * x); g.moveTo(x, -120 - h + 4); g.lineTo(x, -70 + h - 4); }
-    g.moveTo(-42, -4); g.lineTo(42, -4); g.moveTo(-36, 12); g.lineTo(36, 12);                          // anillo
-    g.moveTo(-32, 12); g.lineTo(-20, 190); g.lineTo(20, 190); g.lineTo(32, 12);                         // cuerpo
-    g.moveTo(0, 190); g.bezierCurveTo(0, 260, 90, 250, 80, 340);                                         // cable
+    if (bass) { loop(g, -230, 0, 215, 120, 0.12, sd, t, 0.05); loop(g, -250, 8, 170, 92, -0.08, sd + 1, t, 0.07); }
+    else { loop(g, -250, 0, 185, 150, 0, sd, t, 0.04); loop(g, -85, 0, 120, 105, 0.1, sd + 1, t, 0.05); loop(g, -150, 0, 46, 46, 0, sd + 2, t, 0.03); }
+    const N = NECK(bass), h = bass ? 44 : 34;
+    for (const f of [0.15, 0.36, 0.53, 0.67, 0.78]) { const x = 30 + (N - 30) * f; g.moveTo(x, -h * (1 + 0.4 * f)); g.lineTo(x, h * (1 + 0.4 * f)); }
   }
-  // Teclado de dos octavas (14 teclas blancas de 50 de ancho)
+  // Micrófono en abstracto: una malla de puntitos (la rejilla) que laten con la voz, centrada en (0, -95)
+  function micDots(g, e, t) {
+    g.beginPath();
+    for (let row = -4; row <= 4; row++) for (let col = -4; col <= 4; col++) {
+      const x = (col + (row & 1) * 0.5) * 15, y = row * 13, d = Math.hypot(x, y);
+      if (d > 60) continue;
+      const r = 2 + 4.5 * e * (0.5 + 0.5 * Math.sin(d * 0.15 - t * 7));
+      g.moveTo(x + r, y - 95); g.arc(x, y - 95, r, 0, 2 * Math.PI);
+    }
+  }
+  // Teclado en abstracto: sólo las divisiones y las teclas negras, sin el contorno
   function keysPath(g) {
     g.beginPath();
-    g.rect(-350, -85, 700, 170);
     for (let k = 1; k < 14; k++) { g.moveTo(-350 + 50 * k, -85); g.lineTo(-350 + 50 * k, 85); }
     for (let o = 0; o < 2; o++) for (const b of [1, 2, 4, 5, 6]) g.rect(-350 + 50 * (o * 7 + b) - 15, -85, 30, 100);
   }
-  // Batería dibujada con trazos; cada pieza se dibuja en su lugar y `h` (0..1) es cuánto acaba de sonar
+  // Batería en abstracto (sólo las piezas, sin soportes); cada pieza se dibuja en su lugar y `h` (0..1) es cuánto acaba de sonar
   const KIT = [
     (g, h) => {                                                       // bombo, de frente
       const r = 120 * (1 + 0.07 * h);
       g.moveTo(r, 130); g.arc(0, 130, r, 0, 2 * Math.PI);
       g.moveTo(r - 18, 130); g.arc(0, 130, r - 18, 0, 2 * Math.PI);
       g.moveTo(30, 130); g.arc(0, 130, 30, 0, 2 * Math.PI);
-      g.moveTo(-70, 245); g.lineTo(-95, 275); g.moveTo(70, 245); g.lineTo(95, 275);   // patitas
     },
     (g, h) => {                                                       // redoblante, con su soporte
       const y = 20 - 10 * h, x = -260;
       g.moveTo(x + 85, y); g.ellipse(x, y, 85, 22, 0, 0, 2 * Math.PI);
       g.moveTo(x - 85, y); g.lineTo(x - 85, y + 48); g.ellipse(x, y + 48, 85, 22, 0, Math.PI, 0, true); g.lineTo(x + 85, y);
       for (let k = -2; k <= 2; k++) { g.moveTo(x + k * 32, y + 20 - Math.abs(k) * 3); g.lineTo(x + k * 32, y + 66 - Math.abs(k) * 3); }
-      g.moveTo(x, 90); g.lineTo(x, 230); g.moveTo(x, 230); g.lineTo(x - 50, 275); g.moveTo(x, 230); g.lineTo(x + 50, 275);
     },
     (g, h) => {                                                       // hi-hat: dos platillos que se cierran
       const x = -430, gap = 16 * (1 - h);
       g.moveTo(x + 80, -100 - gap); g.ellipse(x, -100 - gap, 80, 11, 0, 0, 2 * Math.PI);
       g.moveTo(x + 80, -84); g.ellipse(x, -84, 80, 11, 0, 0, 2 * Math.PI);
-      g.moveTo(x, -120 - gap); g.lineTo(x, 230); g.moveTo(x, 230); g.lineTo(x - 45, 275); g.moveTo(x, 230); g.lineTo(x + 45, 275);
     },
     (g, h, t) => {                                                    // platillo: tiembla mientras suena
       const x = 310, a = -0.18 + 0.06 * h * Math.sin(t * 40);
       g.moveTo(x + 115 * Math.cos(a), -150 + 115 * Math.sin(a)); g.ellipse(x, -150, 115, 18, a, 0, 2 * Math.PI);
       g.moveTo(x + 12, -150); g.ellipse(x, -150, 12, 4, a, 0, 2 * Math.PI);
-      g.moveTo(x, -140); g.lineTo(x + 30, 230); g.moveTo(x + 30, 230); g.lineTo(x - 15, 275); g.moveTo(x + 30, 230); g.lineTo(x + 75, 275);
     },
   ];
   const KIT_HIT = [[0, 130], [-260, 10], [-430, -95], [310, -150]];   // dónde salta el destello de cada pieza
@@ -3034,20 +3031,20 @@ void main() {
     // 🎸 Guitarra / bajo: uno por pista, con trazo doble como a mano; en cada ataque le vibran las cuerdas
     const fretted = (list, bass) => {
       const n = list.length, base = (n === 1 ? 0.9 : n === 2 ? 0.75 : 0.6) * (bass ? 0.8 : 1);
-      const C = bass ? 4 : 6, N = bass ? 640 : 430;
+      const C = bass ? 4 : 6, N = NECK(bass);
       for (const [tr, v] of list) {
         if (v < 0.01) continue;
         const P = placeOf(tr, t, A, bass ? 1 : 0);
         if (P.draw < 0.01) continue;
         const e = envOf(tr, t), sc = base * P.s, al = P.draw * I;
         rg.save();
-        rg.translate(P.x, P.y); rg.rotate(P.a * 0.8); rg.scale(sc * P.flip, sc); rg.translate(bass ? -150 : -50, 0);
+        rg.translate(P.x, P.y); rg.rotate(P.a * 0.8); rg.scale(sc * P.flip, sc); rg.translate(bass ? -128 : -40, 0);
         trace(1900, P.draw);
-        guitarPath(rg, bass);
+        guitarPath(rg, bass, tr.seed, t);
         rg.strokeStyle = `rgba(${tr.light},${(0.3 + 0.5 * e) * al})`; rg.lineWidth = 2.5 / sc; rg.stroke();
         rg.save();
         rg.translate(3 + 1.5 * Math.sin(t * 1.3 + tr.seed % 7), -2); rg.rotate(0.006);
-        guitarPath(rg, bass);
+        guitarPath(rg, bass, tr.seed + 17, t * 1.3);
         rg.strokeStyle = `rgba(${tr.tint},${(0.15 + 0.3 * e) * al})`; rg.lineWidth = 1.5 / sc; rg.stroke();
         rg.restore();
         rg.setLineDash([]);
@@ -3065,21 +3062,22 @@ void main() {
           }
           last = [age, a];
         });
-        const sp0 = bass ? 16 : 13, sp1 = bass ? 12 : 10, mid = (C - 1) / 2;
+        const sp0 = bass ? 16 : 12, sp1 = bass ? 34 : 24, mid = (C - 1) / 2;   // las cuerdas se abren en abanico
         for (let s = 0; s < C; s++) {
           const y0 = (s - mid) * sp0, y1 = (s - mid) * sp1, m = amp[s] * al;
           rg.beginPath();
           for (let q = 0; q <= 40; q++) {
             const u = q / 40, d = m * (bass ? 22 : 16) * Math.sin(PI * u) * Math.cos(ph[s]);
-            rg.lineTo(-329 + (N + 329) * u, y0 + (y1 - y0) * u + d);
+            rg.lineTo(-330 + (N + 330) * u, y0 + (y1 - y0) * u + d);
           }
           rg.strokeStyle = `rgba(${tr.light},${(0.25 + 0.4 * e) * al})`; rg.lineWidth = ((bass ? 1.6 : 0.9) + 0.25 * s) / sc; rg.stroke();
           if (m > 0.01) {
             rg.strokeStyle = `rgba(${tr.tint},${0.35 * m})`; rg.lineWidth = 8 / sc; rg.stroke();
             rg.strokeStyle = `rgba(${tr.light},${0.95 * m})`; rg.lineWidth = ((bass ? 2 : 1.2) + 0.3 * s) / sc; rg.stroke();
           }
+          glow(tr, N, y1, 9 + 14 * m, (0.4 + 0.6 * m) * al);          // cada cuerda termina en un puntito de luz
         }
-        if (last && last[0] < 0.5) glow(tr, bass ? -165 : -150, 0, 70 + 70 * last[1], (1 - last[0] / 0.5) * last[1] * 0.8 * al);
+        if (last && last[0] < 0.5) glow(tr, bass ? -230 : -150, 0, 70 + 70 * last[1], (1 - last[0] / 0.5) * last[1] * 0.8 * al);
         rg.restore();
       }
     };
@@ -3158,9 +3156,13 @@ void main() {
       rg.save();
       rg.translate(P.x, P.y); rg.rotate(P.a * 0.7); rg.scale(s, s);
       trace(900, P.draw);
-      micPath(rg);
+      rg.beginPath();
+      loop(rg, 0, -95, 74, 80, 0, tr.seed, t, 0.06);
+      rg.moveTo(0, -12); rg.bezierCurveTo(-35 + 15 * Math.sin(t * 0.6), 80, 60, 170 + 20 * Math.sin(t * 0.4), 15, 330);   // el cable, una sola curva
       rg.strokeStyle = `rgba(${tr.light},${(0.35 + 0.5 * e) * al})`; rg.lineWidth = 2.5 / s; rg.stroke();
       rg.setLineDash([]);
+      micDots(rg, e, t);
+      rg.fillStyle = `rgba(${tr.light},${(0.3 + 0.6 * e) * al})`; rg.fill();
       glow(tr, 0, -95, 90 + 220 * e, 0.5 * e * al);
       eachHit(tr, t, 2.4, (age, a) => {
         const f = age / 2.4, r = 75 + 420 * (1 - Math.exp(-age * 1.4));
@@ -3630,6 +3632,19 @@ void main() {
   $('#stemsFx').addEventListener('change', e => { settings.stemsFx = e.target.value; save(); });
   $('#stemsSpark').value = settings.stemsSpark ?? 1;
   $('#stemsSpark').addEventListener('input', e => { settings.stemsSpark = +e.target.value; save(); });
+  // 🎲 Reparte todos los dibujos al azar: no repite ninguno hasta haberlos usado todos
+  $('#stemsRandom').addEventListener('click', () => {
+    let bag = [];
+    for (const tr of stems.tracks) {
+      if (!bag.length) {
+        bag = Object.keys(SPARK_KINDS).filter(k => k !== 'off');
+        for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+      }
+      tr.fx = bag.pop();
+    }
+    saveSetup(); paintStems();
+  });
+  $('#stemsAutoFx').addEventListener('click', () => { for (const tr of stems.tracks) tr.fx = ''; saveSetup(); paintStems(); });
   $('#stemsOnlyFx').checked = !!settings.stemsOnlyFx;
   $('#stemsOnlyFx').addEventListener('change', e => { settings.stemsOnlyFx = e.target.checked; save(); });
   stems.texts = (settings.stemsTexts || parseStemTexts(settings.stemsText || '')).map(x => ({ t: +x.t || 0, d: +x.d || 3, size: x.size === 0 || x.size === 2 ? x.size : 1, s: String(x.s || '') }));
